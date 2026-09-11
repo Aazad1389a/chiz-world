@@ -654,14 +654,13 @@ export class GraphicsController {
     }
 
     setQuality(quality) {
-        if (!GRAPHICS_PROFILES[quality]) {
-            console.warn(
-    "Unknown graphics quality: " + quality
-);
-            );
+    if (!GRAPHICS_PROFILES[quality]) {
+        console.warn(
+            "Unknown graphics quality: " + quality
+        );
 
-            return this;
-        }
+        return this;
+    }
 
         this.quality = quality;
 
