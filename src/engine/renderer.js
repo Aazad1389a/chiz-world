@@ -16,7 +16,7 @@ import {
     GraphicsController,
     createGameRenderer,
     detectGraphicsCapabilities
-} from "./graphics.js";
+} from "../../graphics.js";
 
 import { gameState } from "../core/game-state.js";
 import { inputManager } from "../core/input-manager.js";
