@@ -1073,192 +1073,130 @@ export class PlayerCamera {
         if (!state) {
             return;
         }
-```javascript
-        const moving =
-            state.moving ||
-            state.running ||
-            state.sprinting ||
-            Math.abs(state.velocity?.x ?? 0) > 0.05 ||
-            Math.abs(state.velocity?.z ?? 0) > 0.05;
 
-        if (!moving) {
-            this.headBobTime = 0;
+        const speed =
+            Math.sqrt(
+                state.velocity.x *
+                    state.velocity.x +
+                state.velocity.z *
+                    state.velocity.z
+            );
+
+        if (
+            !state.grounded ||
+            speed < 0.1
+        ) {
+            this.headBobTime =
+                damp(
+                    this.headBobTime,
+                    0,
+                    8,
+                    deltaTime
+                );
+
             return;
         }
 
-        const speed =
-            state.sprinting
-                ? this.config.headBobSpeed * 1.25
-                : this.config.headBobSpeed;
+        const intensity =
+            clamp(
+                speed /
+                    Math.max(
+                        this.config.sprintFov,
+                        1
+                    ),
+                0,
+                1
+            );
 
-        this.headBobTime += deltaTime * speed;
+        this.headBobTime +=
+            deltaTime *
+            this.config.headBobSpeed *
+            (0.6 + intensity);
 
         const bobX =
-            Math.cos(this.headBobTime * 0.5) *
+            Math.cos(
+                this.headBobTime * 0.5
+            ) *
             this.config.headBobAmount *
-            0.35;
+            intensity;
 
         const bobY =
             Math.abs(
-                Math.sin(this.headBobTime)
+                Math.sin(
+                    this.headBobTime
+                )
             ) *
-            this.config.headBobAmount;
+            this.config.headBobAmount *
+            intensity;
 
-        this.camera.position.x = bobX;
-        this.camera.position.y = bobY;
+        this.camera.position.x =
+            bobX;
+
+        this.camera.position.y =
+            bobY;
     }
 
     /**
      * Camera shake.
      */
     updateShake(deltaTime) {
-        if (!this.shake.active) {
-            return;
-        }
-
-        this.shake.elapsed += deltaTime;
-
         if (
-            this.shake.elapsed >=
-            this.shake.duration
+            !this.shake.active
         ) {
-            this.shake.active = false;
-            this.shake.intensity = 0;
-            this.shake.duration = 0;
-            this.shake.elapsed = 0;
-            return;
-        }
-    }
-
-    /**
-     * Apply final camera transform.
-     */
-    applyFinalTransform() {
-        if (!this.camera) {
             return;
         }
 
-        this.object.position.copy(
-            this.currentPosition
-        );
+        this.shake.elapsed +=
+            deltaTime;
 
-        this.object.rotation.y =
-            this.currentYaw;
-
-        this.camera.rotation.x =
-            this.currentPitch;
-
-        /*
-         * Camera shake is applied after
-         * the normal transform.
-         */
-        if (this.shake.active) {
-            const remaining =
-                1 -
+        const progress =
+            clamp(
                 this.shake.elapsed /
                     Math.max(
                         this.shake.duration,
                         0.001
-                    );
-
-            const intensity =
-                this.shake.intensity *
-                Math.max(remaining, 0);
-
-            this.camera.rotation.x +=
-                (Math.random() - 0.5) *
-                intensity;
-
-            this.camera.rotation.y +=
-                (Math.random() - 0.5) *
-                intensity;
-        }
-
-        /*
-         * Head bob is handled locally on
-         * the camera position.
-         */
-    }
-
-    /**
-     * Synchronize useful camera data
-     * with the global game state.
-     */
-    syncState() {
-        if (!gameState) {
-            return;
-        }
-
-        try {
-            if (
-                typeof gameState.setCameraState ===
-                "function"
-            ) {
-                gameState.setCameraState(
-                    this.getSnapshot()
-                );
-            }
-        } catch (error) {
-            console.warn(
-                "[Camera] Could not sync camera state:",
-                error
+                    ),
+                0,
+                1
             );
+
+        const strength =
+            this.shake.intensity *
+            (1 - progress);
+
+        this.camera.position.x +=
+            (Math.random() * 2 - 1) *
+            strength;
+
+        this.camera.position.y +=
+            (Math.random() * 2 - 1) *
+            strength;
+
+        this.camera.position.z +=
+            (Math.random() * 2 - 1) *
+            strength;
+
+        if (progress >= 1) {
+            this.shake.active =
+                false;
+
+            this.shake.intensity =
+                0;
+
+            this.shake.duration =
+                0;
+
+            this.shake.elapsed =
+                0;
         }
     }
 
     /**
-     * Set camera position.
+     * Start camera shake.
      */
-    setPosition(position) {
-        if (!position) {
-            return this;
-        }
-
-        if (position.isVector3) {
-            this.targetPosition.copy(position);
-            this.currentPosition.copy(position);
-        } else {
-            this.targetPosition.set(
-                Number(position.x) || 0,
-                Number(position.y) || 0,
-                Number(position.z) || 0
-            );
-
-            this.currentPosition.copy(
-                this.targetPosition
-            );
-        }
-
-        return this;
-    }
-
-    /**
-     * Set camera distance.
-     */
-    setDistance(distance) {
-        const value =
-            Number(distance);
-
-        if (!Number.isFinite(value)) {
-            return this;
-        }
-
-        this.targetDistance =
-            clamp(
-                value,
-                this.config.minDistance,
-                this.config.maxDistance
-            );
-
-        return this;
-    }
-
-    /**
-     * Add camera shake.
-     */
-    shakeCamera(
-        intensity = 0.03,
-        duration = 0.2
+    startShake(
+        intensity = 0.05,
+        duration = 0.15
     ) {
         this.shake.active = true;
 
@@ -1276,46 +1214,128 @@ export class PlayerCamera {
 
         this.shake.elapsed = 0;
 
-        return this;
+        this.emitter.emit(
+            "shake",
+            {
+                intensity:
+                    this.shake.intensity,
+                duration:
+                    this.shake.duration
+            }
+        );
     }
 
     /**
-     * Enable camera.
+     * Stop shake.
      */
-    enable() {
-        this.enabled = true;
-        return this;
+    stopShake() {
+        this.shake.active =
+            false;
+
+        this.shake.elapsed = 0;
+        this.shake.intensity = 0;
+        this.shake.duration = 0;
     }
 
     /**
-     * Disable camera.
+     * Apply final camera transform.
      */
-    disable() {
-        this.enabled = false;
-        return this;
+    applyFinalTransform() {
+        this.object.position.copy(
+            this.currentPosition
+        );
+
+        /**
+         * Camera looks toward player.
+         */
+        this.lookTarget.copy(
+            this.playerTarget
+        );
+
+        if (
+            this.mode ===
+            "firstPerson"
+        ) {
+            const direction =
+                new THREE.Vector3(
+                    Math.sin(
+                        this.currentYaw
+                    ) *
+                        Math.cos(
+                            this.currentPitch
+                        ),
+
+                    Math.sin(
+                        this.currentPitch
+                    ),
+
+                    Math.cos(
+                        this.currentYaw
+                    ) *
+                        Math.cos(
+                            this.currentPitch
+                        )
+                );
+
+            const target =
+                this.currentPosition
+                    .clone()
+                    .add(direction);
+
+            this.camera.lookAt(
+                target
+            );
+        } else {
+            this.camera.lookAt(
+                this.lookTarget
+            );
+        }
     }
 
     /**
-     * Add objects used for camera collision.
+     * Add collision objects.
      */
-    addCollisionObject(object) {
+    setCollisionObjects(
+        objects = []
+    ) {
+        if (!Array.isArray(objects)) {
+            this.collisionObjects = [];
+            return;
+        }
+
+        this.collisionObjects =
+            objects.filter(
+                Boolean
+            );
+    }
+
+    /**
+     * Add one collision object.
+     */
+    addCollisionObject(
+        object
+    ) {
         if (!object) {
-            return this;
+            return;
         }
 
         if (
-            !this.collisionObjects.includes(object)
+            !this.collisionObjects.includes(
+                object
+            )
         ) {
-            this.collisionObjects.push(object);
+            this.collisionObjects.push(
+                object
+            );
         }
-
-        return this;
     }
 
     /**
-     * Remove a camera collision object.
+     * Remove collision object.
      */
-    removeCollisionObject(object) {
+    removeCollisionObject(
+        object
+    ) {
         const index =
             this.collisionObjects.indexOf(
                 object
@@ -1327,63 +1347,211 @@ export class PlayerCamera {
                 1
             );
         }
-
-        return this;
     }
 
     /**
-     * Clear all collision objects.
+     * Enable / disable collision.
      */
-    clearCollisionObjects() {
-        this.collisionObjects.length = 0;
-        return this;
+    setCollisionEnabled(
+        enabled
+    ) {
+        this.collisionEnabled =
+            Boolean(enabled);
+    }
+
+    /**
+     * Change FOV.
+     */
+    setFov(fov) {
+        this.config.fov =
+            clamp(
+                Number(fov) || 70,
+                40,
+                120
+            );
+
+        this.targetFov =
+            this.config.fov;
+    }
+
+    /**
+     * Set camera distance.
+     */
+    setDistance(distance) {
+        this.targetDistance =
+            clamp(
+                Number(distance) ||
+                    this.config.distance,
+                this.config.minDistance,
+                this.config.maxDistance
+            );
+    }
+
+    /**
+     * Set sensitivity.
+     */
+    setSensitivity(
+        sensitivity
+    ) {
+        this.mouseSensitivity =
+            clamp(
+                Number(sensitivity) ||
+                    this.config.mouseSensitivity,
+                0.0001,
+                0.02
+            );
     }
 
     /**
      * Resize camera.
      */
-    resize() {
-        if (!this.camera) {
-            return this;
-        }
-
-        const width =
+    resize(
+        width = window.innerWidth,
+        height = window.innerHeight
+    ) {
+        const safeWidth =
             Math.max(
-                window.innerWidth || 1,
-                1
+                1,
+                Number(width) || 1
             );
 
-        const height =
+        const safeHeight =
             Math.max(
-                window.innerHeight || 1,
-                1
+                1,
+                Number(height) || 1
             );
 
         this.camera.aspect =
-            width / height;
+            safeWidth /
+            safeHeight;
 
         this.camera.updateProjectionMatrix();
-
-        return this;
     }
 
     /**
-     * Get a snapshot of the current
-     * camera state.
+     * Enable.
+     */
+    enable() {
+        this.enabled = true;
+    }
+
+    /**
+     * Disable.
+     */
+    disable() {
+        this.enabled = false;
+    }
+
+    /**
+     * Toggle.
+     */
+    toggle() {
+        this.enabled =
+            !this.enabled;
+
+        return this.enabled;
+    }
+
+    /**
+     * Get camera object.
+     */
+    getCamera() {
+        return this.camera;
+    }
+
+    /**
+     * Get camera root.
+     */
+    getObject() {
+        return this.object;
+    }
+
+    /**
+     * Get mode.
+     */
+    getMode() {
+        return this.mode;
+    }
+
+    /**
+     * Get yaw.
+     */
+    getYaw() {
+        return this.yaw;
+    }
+
+    /**
+     * Get pitch.
+     */
+    getPitch() {
+        return this.pitch;
+    }
+
+    /**
+     * Get distance.
+     */
+    getDistance() {
+        return this.distance;
+    }
+
+    /**
+     * Sync with GameState.
+     */
+    syncState() {
+        if (!gameState) {
+            return;
+        }
+
+        gameState.update(
+            "player",
+            {
+                rotation: {
+                    x:
+                        playerController
+                            .getSnapshot()
+                            .rotation.x,
+
+                    y: this.yaw,
+
+                    z:
+                        playerController
+                            .getSnapshot()
+                            .rotation.z
+                }
+            }
+        );
+    }
+
+    /**
+     * Snapshot.
      */
     getSnapshot() {
         return {
             mode: this.mode,
 
-            yaw: this.yaw,
+            position: {
+                x:
+                    this.object.position.x,
 
-            pitch: this.pitch,
+                y:
+                    this.object.position.y,
 
-            currentYaw:
-                this.currentYaw,
+                z:
+                    this.object.position.z
+            },
 
-            currentPitch:
-                this.currentPitch,
+            rotation: {
+                yaw: this.yaw,
+                pitch: this.pitch
+            },
+
+            currentRotation: {
+                yaw:
+                    this.currentYaw,
+
+                pitch:
+                    this.currentPitch
+            },
 
             distance:
                 this.distance,
@@ -1397,22 +1565,49 @@ export class PlayerCamera {
             enabled:
                 this.enabled,
 
-            initialized:
-                this.initialized,
-
-            position: {
-                x:
-                    this.currentPosition.x,
-                y:
-                    this.currentPosition.y,
-                z:
-                    this.currentPosition.z
-            }
+            collisionEnabled:
+                this.collisionEnabled
         };
     }
 
     /**
-     * Subscribe to camera events.
+     * Debug information.
+     */
+    getDebugInfo() {
+        return {
+            mode: this.mode,
+
+            position:
+                this.object.position.toArray(),
+
+            yaw:
+                this.yaw,
+
+            pitch:
+                this.pitch,
+
+            distance:
+                this.distance,
+
+            targetDistance:
+                this.targetDistance,
+
+            fov:
+                this.currentFov,
+
+            collision:
+                this.collisionEnabled,
+
+            collisionObjects:
+                this.collisionObjects.length,
+
+            enabled:
+                this.enabled
+        };
+    }
+
+    /**
+     * Events.
      */
     on(event, callback) {
         return this.emitter.on(
@@ -1421,22 +1616,17 @@ export class PlayerCamera {
         );
     }
 
-    /**
-     * Remove event listener.
-     */
     off(event, callback) {
         this.emitter.off(
             event,
             callback
         );
-
-        return this;
     }
 
     /**
-     * Destroy camera system.
+     * Cleanup.
      */
-    destroy() {
+    dispose() {
         window.removeEventListener(
             "resize",
             this.boundResize
@@ -1452,69 +1642,46 @@ export class PlayerCamera {
             this.boundWheel
         );
 
+        this.stopShake();
+
+        this.collisionObjects = [];
+
         this.emitter.clear();
 
-        this.collisionObjects.length = 0;
-
-        if (
-            this.object.parent
-        ) {
-            this.object.parent.remove(
-                this.object
-            );
-        }
-
-        this.camera = null;
-        this.object = null;
         this.initialized = false;
         this.enabled = false;
     }
 }
 
 /**
- * Create the default player camera.
+ * Singleton camera.
  */
 export const playerCamera =
     new PlayerCamera();
 
 /**
- * Initialize the default camera.
+ * Initialize helper.
  */
-export function initializePlayerCamera(
-    options = {}
-) {
-    if (
-        options &&
-        typeof options === "object"
-    ) {
-        Object.assign(
-            playerCamera.options,
-            options
-        );
-    }
-
+export function initializePlayerCamera() {
     return playerCamera.initialize();
 }
 
 /**
- * Update the default camera.
+ * Update helper.
  */
 export function updatePlayerCamera(
-    deltaTime = 1 / 60
+    deltaTime
 ) {
     playerCamera.update(
         deltaTime
     );
-
-    return playerCamera;
 }
 
 /**
- * Get the default camera object.
+ * Get camera helper.
  */
 export function getPlayerCamera() {
     return playerCamera;
 }
 
 export default playerCamera;
-```
