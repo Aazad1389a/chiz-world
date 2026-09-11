@@ -407,9 +407,7 @@ async function initializeRendering() {
     getElement("game") ||
     document.body;
 
-  initializeRenderer({
-    container
-  });
+ initializeRenderer(container);
 
   systems.push(
     rendererSystem
