@@ -17,8 +17,8 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
  * را بعداً با اطلاعات پروژه خودت جایگزین کن.
  */
 
-const SUPABASE_URL = "YOUR_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://zfyxvvquukhqapujyygv.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "sb_publishable_4Pn17itO540ZN5PCp05qaw_MkaZ-Dmo";
 
 const isConfigured =
     SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
