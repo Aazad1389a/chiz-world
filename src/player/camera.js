@@ -1073,3 +1073,448 @@ export class PlayerCamera {
         if (!state) {
             return;
         }
+```javascript
+        const moving =
+            state.moving ||
+            state.running ||
+            state.sprinting ||
+            Math.abs(state.velocity?.x ?? 0) > 0.05 ||
+            Math.abs(state.velocity?.z ?? 0) > 0.05;
+
+        if (!moving) {
+            this.headBobTime = 0;
+            return;
+        }
+
+        const speed =
+            state.sprinting
+                ? this.config.headBobSpeed * 1.25
+                : this.config.headBobSpeed;
+
+        this.headBobTime += deltaTime * speed;
+
+        const bobX =
+            Math.cos(this.headBobTime * 0.5) *
+            this.config.headBobAmount *
+            0.35;
+
+        const bobY =
+            Math.abs(
+                Math.sin(this.headBobTime)
+            ) *
+            this.config.headBobAmount;
+
+        this.camera.position.x = bobX;
+        this.camera.position.y = bobY;
+    }
+
+    /**
+     * Camera shake.
+     */
+    updateShake(deltaTime) {
+        if (!this.shake.active) {
+            return;
+        }
+
+        this.shake.elapsed += deltaTime;
+
+        if (
+            this.shake.elapsed >=
+            this.shake.duration
+        ) {
+            this.shake.active = false;
+            this.shake.intensity = 0;
+            this.shake.duration = 0;
+            this.shake.elapsed = 0;
+            return;
+        }
+    }
+
+    /**
+     * Apply final camera transform.
+     */
+    applyFinalTransform() {
+        if (!this.camera) {
+            return;
+        }
+
+        this.object.position.copy(
+            this.currentPosition
+        );
+
+        this.object.rotation.y =
+            this.currentYaw;
+
+        this.camera.rotation.x =
+            this.currentPitch;
+
+        /*
+         * Camera shake is applied after
+         * the normal transform.
+         */
+        if (this.shake.active) {
+            const remaining =
+                1 -
+                this.shake.elapsed /
+                    Math.max(
+                        this.shake.duration,
+                        0.001
+                    );
+
+            const intensity =
+                this.shake.intensity *
+                Math.max(remaining, 0);
+
+            this.camera.rotation.x +=
+                (Math.random() - 0.5) *
+                intensity;
+
+            this.camera.rotation.y +=
+                (Math.random() - 0.5) *
+                intensity;
+        }
+
+        /*
+         * Head bob is handled locally on
+         * the camera position.
+         */
+    }
+
+    /**
+     * Synchronize useful camera data
+     * with the global game state.
+     */
+    syncState() {
+        if (!gameState) {
+            return;
+        }
+
+        try {
+            if (
+                typeof gameState.setCameraState ===
+                "function"
+            ) {
+                gameState.setCameraState(
+                    this.getSnapshot()
+                );
+            }
+        } catch (error) {
+            console.warn(
+                "[Camera] Could not sync camera state:",
+                error
+            );
+        }
+    }
+
+    /**
+     * Set camera position.
+     */
+    setPosition(position) {
+        if (!position) {
+            return this;
+        }
+
+        if (position.isVector3) {
+            this.targetPosition.copy(position);
+            this.currentPosition.copy(position);
+        } else {
+            this.targetPosition.set(
+                Number(position.x) || 0,
+                Number(position.y) || 0,
+                Number(position.z) || 0
+            );
+
+            this.currentPosition.copy(
+                this.targetPosition
+            );
+        }
+
+        return this;
+    }
+
+    /**
+     * Set camera distance.
+     */
+    setDistance(distance) {
+        const value =
+            Number(distance);
+
+        if (!Number.isFinite(value)) {
+            return this;
+        }
+
+        this.targetDistance =
+            clamp(
+                value,
+                this.config.minDistance,
+                this.config.maxDistance
+            );
+
+        return this;
+    }
+
+    /**
+     * Add camera shake.
+     */
+    shakeCamera(
+        intensity = 0.03,
+        duration = 0.2
+    ) {
+        this.shake.active = true;
+
+        this.shake.intensity =
+            Math.max(
+                0,
+                Number(intensity) || 0
+            );
+
+        this.shake.duration =
+            Math.max(
+                0,
+                Number(duration) || 0
+            );
+
+        this.shake.elapsed = 0;
+
+        return this;
+    }
+
+    /**
+     * Enable camera.
+     */
+    enable() {
+        this.enabled = true;
+        return this;
+    }
+
+    /**
+     * Disable camera.
+     */
+    disable() {
+        this.enabled = false;
+        return this;
+    }
+
+    /**
+     * Add objects used for camera collision.
+     */
+    addCollisionObject(object) {
+        if (!object) {
+            return this;
+        }
+
+        if (
+            !this.collisionObjects.includes(object)
+        ) {
+            this.collisionObjects.push(object);
+        }
+
+        return this;
+    }
+
+    /**
+     * Remove a camera collision object.
+     */
+    removeCollisionObject(object) {
+        const index =
+            this.collisionObjects.indexOf(
+                object
+            );
+
+        if (index !== -1) {
+            this.collisionObjects.splice(
+                index,
+                1
+            );
+        }
+
+        return this;
+    }
+
+    /**
+     * Clear all collision objects.
+     */
+    clearCollisionObjects() {
+        this.collisionObjects.length = 0;
+        return this;
+    }
+
+    /**
+     * Resize camera.
+     */
+    resize() {
+        if (!this.camera) {
+            return this;
+        }
+
+        const width =
+            Math.max(
+                window.innerWidth || 1,
+                1
+            );
+
+        const height =
+            Math.max(
+                window.innerHeight || 1,
+                1
+            );
+
+        this.camera.aspect =
+            width / height;
+
+        this.camera.updateProjectionMatrix();
+
+        return this;
+    }
+
+    /**
+     * Get a snapshot of the current
+     * camera state.
+     */
+    getSnapshot() {
+        return {
+            mode: this.mode,
+
+            yaw: this.yaw,
+
+            pitch: this.pitch,
+
+            currentYaw:
+                this.currentYaw,
+
+            currentPitch:
+                this.currentPitch,
+
+            distance:
+                this.distance,
+
+            targetDistance:
+                this.targetDistance,
+
+            fov:
+                this.currentFov,
+
+            enabled:
+                this.enabled,
+
+            initialized:
+                this.initialized,
+
+            position: {
+                x:
+                    this.currentPosition.x,
+                y:
+                    this.currentPosition.y,
+                z:
+                    this.currentPosition.z
+            }
+        };
+    }
+
+    /**
+     * Subscribe to camera events.
+     */
+    on(event, callback) {
+        return this.emitter.on(
+            event,
+            callback
+        );
+    }
+
+    /**
+     * Remove event listener.
+     */
+    off(event, callback) {
+        this.emitter.off(
+            event,
+            callback
+        );
+
+        return this;
+    }
+
+    /**
+     * Destroy camera system.
+     */
+    destroy() {
+        window.removeEventListener(
+            "resize",
+            this.boundResize
+        );
+
+        window.removeEventListener(
+            "mousemove",
+            this.boundMouseMove
+        );
+
+        window.removeEventListener(
+            "wheel",
+            this.boundWheel
+        );
+
+        this.emitter.clear();
+
+        this.collisionObjects.length = 0;
+
+        if (
+            this.object.parent
+        ) {
+            this.object.parent.remove(
+                this.object
+            );
+        }
+
+        this.camera = null;
+        this.object = null;
+        this.initialized = false;
+        this.enabled = false;
+    }
+}
+
+/**
+ * Create the default player camera.
+ */
+export const playerCamera =
+    new PlayerCamera();
+
+/**
+ * Initialize the default camera.
+ */
+export function initializePlayerCamera(
+    options = {}
+) {
+    if (
+        options &&
+        typeof options === "object"
+    ) {
+        Object.assign(
+            playerCamera.options,
+            options
+        );
+    }
+
+    return playerCamera.initialize();
+}
+
+/**
+ * Update the default camera.
+ */
+export function updatePlayerCamera(
+    deltaTime = 1 / 60
+) {
+    playerCamera.update(
+        deltaTime
+    );
+
+    return playerCamera;
+}
+
+/**
+ * Get the default camera object.
+ */
+export function getPlayerCamera() {
+    return playerCamera;
+}
+
+export default playerCamera;
+```
