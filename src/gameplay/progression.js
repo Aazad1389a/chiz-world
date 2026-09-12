@@ -1,55 +1,35 @@
 import { profileManager } from "../api/profile.js";
+import { authManager } from "../api/auth.js";
 import { gameState } from "../core/game-state.js";
-import { missionsManager } from "./missions.js";
+import { missionManager } from "./missions.js";
 
 /**
  * AZAD WORLD
  * Progression System
  *
- * Mission rewards
- * XP
- * Coins
- * Level progression
- * Supabase profile synchronization
+ * Handles mission rewards, XP, coins, levels and profile sync.
  */
 
 class ProgressionManager {
     constructor() {
         this.initialized = false;
         this.pendingRewards = [];
+        this.authUnsubscribe = null;
 
-        this.handleMissionCompleted =
-            this.handleMissionCompleted.bind(this);
-
-        this.handleAuthChange =
-            this.handleAuthChange.bind(this);
+        this.handleMissionCompleted = this.handleMissionCompleted.bind(this);
+        this.handleAuthChange = this.handleAuthChange.bind(this);
     }
 
     initialize() {
-        if (this.initialized) {
-            return;
-        }
-
+        if (this.initialized) return;
         this.initialized = true;
 
-        if (
-            missionsManager &&
-            typeof missionsManager.on === "function"
-        ) {
-            missionsManager.on(
-                "missionCompleted",
-                this.handleMissionCompleted
-            );
+        if (missionManager && typeof missionManager.on === "function") {
+            missionManager.on("missionCompleted", this.handleMissionCompleted);
         }
 
-        if (
-            profileManager &&
-            typeof profileManager.on === "function"
-        ) {
-            profileManager.on(
-                "authenticated",
-                this.handleAuthChange
-            );
+        if (authManager && typeof authManager.onChange === "function") {
+            this.authUnsubscribe = authManager.onChange(this.handleAuthChange);
         }
 
         this.syncProfileToGameState();
@@ -59,182 +39,79 @@ class ProgressionManager {
         const mission = payload.mission || {};
         const rewards = payload.rewards || mission.rewards || {};
 
-        const experience = Math.max(
-            0,
-            Number(rewards.experience || 0)
-        );
-
-        const coins = Math.max(
-            0,
-            Number(rewards.coins || 0)
-        );
-
-        if (experience <= 0 && coins <= 0) {
-            return {
-                success: true,
-                experience: 0,
-                coins: 0
-            };
-        }
-
-        await this.awardRewards({
-            experience,
-            coins,
+        return await this.awardRewards({
+            experience: Math.max(0, Number(rewards.experience || 0)),
+            coins: Math.max(0, Number(rewards.coins || 0)),
             reason: mission.id || mission.title || "mission"
         });
     }
 
-    async awardRewards({
-        experience = 0,
-        coins = 0,
-        reason = "gameplay"
-    } = {}) {
+    async awardRewards({ experience = 0, coins = 0, reason = "gameplay" } = {}) {
         const xp = Math.max(0, Number(experience || 0));
         const coinAmount = Math.max(0, Number(coins || 0));
 
         if (xp <= 0 && coinAmount <= 0) {
-            return {
-                success: true,
-                experience: 0,
-                coins: 0
-            };
+            return { ok: true, experience: 0, coins: 0 };
         }
 
-        const user =
-            typeof profileManager.getCurrentUser === "function"
-                ? await profileManager.getCurrentUser()
-                : null;
+        const user = authManager && typeof authManager.getUser === "function"
+            ? await authManager.getUser()
+            : null;
 
         if (!user) {
-            this.pendingRewards.push({
-                experience: xp,
-                coins: coinAmount,
-                reason
-            });
-
+            this.pendingRewards.push({ experience: xp, coins: coinAmount, reason });
             this.applyLocalRewards(xp, coinAmount);
-
-            return {
-                success: false,
-                pending: true,
-                experience: xp,
-                coins: coinAmount
-            };
+            return { ok: false, pending: true, experience: xp, coins: coinAmount };
         }
 
-        let xpResult = {
-            success: true,
-            profile: null
-        };
+        let xpResult = { ok: true, data: null };
+        let coinResult = { ok: true, data: null };
 
-        let coinResult = {
-            success: true,
-            profile: null
-        };
+        if (xp > 0) xpResult = await profileManager.addExperience(xp);
+        if (coinAmount > 0) coinResult = await profileManager.addCoins(coinAmount);
 
-        if (xp > 0) {
-            xpResult =
-                await profileManager.addExperience(xp);
-        }
-
-        if (coinAmount > 0) {
-            coinResult =
-                await profileManager.addCoins(coinAmount);
-        }
-
-        const profile =
-            coinResult.profile ||
-            xpResult.profile ||
-            null;
-
-        if (profile) {
-            this.syncProfileToGameState(profile);
-        }
+        const profile = coinResult.data || xpResult.data || profileManager.getCachedProfile();
+        if (profile) this.syncProfileToGameState(profile);
 
         const result = {
-            success:
-                xpResult.success !== false &&
-                coinResult.success !== false,
+            ok: xpResult.ok !== false && coinResult.ok !== false,
             experience: xp,
             coins: coinAmount,
             profile,
-            reason,
-            leveledUp:
-                Boolean(xpResult.leveledUp),
-            levelsGained:
-                Number(xpResult.levelsGained || 0)
+            reason
         };
 
-        window.dispatchEvent(
-            new CustomEvent("azad:progression-updated", {
-                detail: result
-            })
-        );
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("azad:progression-updated", { detail: result }));
+        }
 
         return result;
     }
 
     applyLocalRewards(experience, coins) {
-        const currentXP =
-            Number(gameState.get("player.experience") || 0);
-
-        const currentCoins =
-            Number(gameState.get("player.coins") || 0);
-
-        gameState.set(
-            "player.experience",
-            currentXP + experience
-        );
-
-        gameState.set(
-            "player.coins",
-            currentCoins + coins
-        );
+        gameState.set("player.experience", Number(gameState.get("player.experience") || 0) + experience);
+        gameState.set("player.coins", Number(gameState.get("player.coins") || 0) + coins);
     }
 
     syncProfileToGameState(profile = null) {
-        if (!profile) {
-            profile =
-                typeof profileManager.getCachedProfile === "function"
-                    ? profileManager.getCachedProfile()
-                    : null;
-        }
+        const current = profile || profileManager.getCachedProfile();
+        if (!current) return;
 
-        if (!profile) {
-            return;
-        }
-
-        if (profile.level != null) {
-            gameState.set(
-                "player.level",
-                Number(profile.level)
-            );
-        }
-
-        if (profile.experience != null) {
-            gameState.set(
-                "player.experience",
-                Number(profile.experience)
-            );
-        }
-
-        if (profile.coins != null) {
-            gameState.set(
-                "player.coins",
-                Number(profile.coins)
-            );
-        }
+        if (current.level != null) gameState.set("player.level", Number(current.level));
+        if (current.experience != null) gameState.set("player.experience", Number(current.experience));
+        if (current.coins != null) gameState.set("player.coins", Number(current.coins));
     }
 
     async handleAuthChange() {
-        this.syncProfileToGameState();
+        const profileResult = await profileManager.getProfile();
+        if (profileResult?.ok && profileResult.data) {
+            this.syncProfileToGameState(profileResult.data);
+        }
         await this.flushPendingRewards();
     }
 
     async flushPendingRewards() {
-        if (!this.pendingRewards.length) {
-            return;
-        }
+        if (!this.pendingRewards.length) return;
 
         const rewards = [...this.pendingRewards];
         this.pendingRewards.length = 0;
@@ -245,40 +122,26 @@ class ProgressionManager {
     }
 
     async awardExperience(amount, reason = "gameplay") {
-        return this.awardRewards({
-            experience: amount,
-            coins: 0,
-            reason
-        });
+        return await this.awardRewards({ experience: amount, coins: 0, reason });
     }
 
     async awardCoins(amount, reason = "gameplay") {
-        return this.awardRewards({
-            experience: 0,
-            coins: amount,
-            reason
-        });
+        return await this.awardRewards({ experience: 0, coins: amount, reason });
     }
 
     dispose() {
-        if (
-            missionsManager &&
-            typeof missionsManager.off === "function"
-        ) {
-            missionsManager.off(
-                "missionCompleted",
-                this.handleMissionCompleted
-            );
+        if (missionManager && typeof missionManager.off === "function") {
+            missionManager.off("missionCompleted", this.handleMissionCompleted);
         }
+        if (typeof this.authUnsubscribe === "function") this.authUnsubscribe();
 
+        this.authUnsubscribe = null;
         this.initialized = false;
         this.pendingRewards.length = 0;
     }
 }
 
-export const progressionManager =
-    new ProgressionManager();
-
+export const progressionManager = new ProgressionManager();
 progressionManager.initialize();
 
 export default progressionManager;
