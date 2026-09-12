@@ -753,3 +753,4 @@ export default {
     GraphicsController
 };
 ```
+export { GraphicsController };
