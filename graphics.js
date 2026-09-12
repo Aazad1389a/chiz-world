@@ -1,3 +1,4 @@
+console.log("AZAD GRAPHICS FILE LOADED - VERSION 2");
 ```javascript
 import * as THREE from "three";
 
