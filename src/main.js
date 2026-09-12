@@ -61,6 +61,8 @@ import {
   initializeMissionManager
 } from "./gameplay/missions.js";
 
+import { progressionManager } from "./gameplay/progression.js";
+
 import {
   inventoryManager,
   initializeInventoryManager
@@ -256,7 +258,6 @@ function hideLoadingScreen() {
 
   }
 
-
   loading.classList.add(
     "hidden"
   );
@@ -286,7 +287,6 @@ function showLoadingScreen(
     return;
 
   }
-
 
   loading.classList.remove(
     "hidden"
@@ -792,6 +792,27 @@ async function initializeGameplaySystems() {
   );
 
 
+  /* -------------------------------------------------------
+     Progression
+  ------------------------------------------------------- */
+
+  if (
+    progressionManager &&
+    typeof progressionManager.initialize ===
+      "function"
+  ) {
+
+    progressionManager.initialize();
+
+  }
+
+
+  setLoadingProgress(
+    81,
+    "راه‌اندازی سیستم پیشرفت و پاداش..."
+  );
+
+
   initializeInventoryManager();
 
   systems.push(
@@ -1020,7 +1041,6 @@ function connectDOMButtons() {
       "resume-button"
     );
 
-
   if (resumeButton) {
 
     resumeButton.addEventListener(
@@ -1043,7 +1063,6 @@ function connectDOMButtons() {
     getElement(
       "quit-button"
     );
-
 
   if (quitButton) {
 
@@ -1070,7 +1089,6 @@ function connectDOMButtons() {
       "pause-settings-button"
     );
 
-
   if (pauseSettings) {
 
     pauseSettings.addEventListener(
@@ -1082,7 +1100,6 @@ function connectDOMButtons() {
             "pause-menu"
           );
 
-
         if (pauseMenu) {
 
           pauseMenu.classList.add(
@@ -1091,12 +1108,10 @@ function connectDOMButtons() {
 
         }
 
-
         const settingsPanel =
           getElement(
             "settings-panel"
           );
-
 
         if (settingsPanel) {
 
@@ -1120,7 +1135,6 @@ function connectDOMButtons() {
     getElement(
       "reload-button"
     );
-
 
   if (reloadButton) {
 
@@ -1150,11 +1164,6 @@ function connectAuthentication() {
 
   }
 
-
-  /* -------------------------------------------------------
-     Login/Register success
-  ------------------------------------------------------- */
-
   authUIManager.on(
     "authenticated",
     async () => {
@@ -1162,25 +1171,16 @@ function connectAuthentication() {
       app.authenticated =
         true;
 
-
       await refreshAuthenticationState();
-
 
       authUIManager.hide();
 
-
       showMainMenu();
-
 
       startGameplay();
 
     }
   );
-
-
-  /* -------------------------------------------------------
-     Auth state changed
-  ------------------------------------------------------- */
 
   authUIManager.on(
     "auth-change",
@@ -1191,11 +1191,6 @@ function connectAuthentication() {
     }
   );
 
-
-  /* -------------------------------------------------------
-     Logout
-  ------------------------------------------------------- */
-
   authUIManager.on(
     "logout",
     async () => {
@@ -1203,9 +1198,7 @@ function connectAuthentication() {
       app.authenticated =
         false;
 
-
       await refreshAuthenticationState();
-
 
       stopGameplay();
 
@@ -1229,11 +1222,6 @@ function connectSystems() {
     "Connecting game systems..."
   );
 
-
-  /* -------------------------------------------------------
-     Menu → Game
-  ------------------------------------------------------- */
-
   if (
     menuManager &&
     typeof menuManager.on ===
@@ -1247,7 +1235,6 @@ function connectSystems() {
         const user =
           await refreshAuthenticationState();
 
-
         if (!user) {
 
           authUIManager.show();
@@ -1256,12 +1243,10 @@ function connectSystems() {
 
         }
 
-
         startGameplay();
 
       }
     );
-
 
     menuManager.on(
       "gameLoaded",
@@ -1270,7 +1255,6 @@ function connectSystems() {
         const user =
           await refreshAuthenticationState();
 
-
         if (!user) {
 
           authUIManager.show();
@@ -1279,12 +1263,10 @@ function connectSystems() {
 
         }
 
-
         startGameplay();
 
       }
     );
-
 
     menuManager.on(
       "paused",
@@ -1295,7 +1277,6 @@ function connectSystems() {
       }
     );
 
-
     menuManager.on(
       "resumed",
       () => {
@@ -1304,7 +1285,6 @@ function connectSystems() {
 
       }
     );
-
 
     menuManager.on(
       "exited",
@@ -1318,11 +1298,6 @@ function connectSystems() {
     );
 
   }
-
-
-  /* -------------------------------------------------------
-     Settings → Renderer
-  ------------------------------------------------------- */
 
   settingsManager.on(
     "qualityChanged",
@@ -1343,7 +1318,6 @@ function connectSystems() {
     }
   );
 
-
   settingsManager.on(
     "renderScaleChanged",
     ({ renderScale }) => {
@@ -1363,7 +1337,6 @@ function connectSystems() {
     }
   );
 
-
   settingsManager.on(
     "shadowQualityChanged",
     ({ quality }) => {
@@ -1382,11 +1355,6 @@ function connectSystems() {
 
     }
   );
-
-
-  /* -------------------------------------------------------
-     Settings → Input
-  ------------------------------------------------------- */
 
   settingsManager.on(
     "controlsChanged",
@@ -1410,11 +1378,6 @@ function connectSystems() {
     }
   );
 
-
-  /* -------------------------------------------------------
-     Interaction → HUD
-  ------------------------------------------------------- */
-
   interactionManager.on(
     "targetChanged",
     (target) => {
@@ -1427,7 +1390,6 @@ function connectSystems() {
 
       }
 
-
       hudManager.showInteraction(
         target.prompt ||
         target.name ||
@@ -1436,7 +1398,6 @@ function connectSystems() {
 
     }
   );
-
 
   interactionManager.on(
     "interacted",
@@ -1448,7 +1409,6 @@ function connectSystems() {
 
       }
 
-
       hudManager.notify(
         target.successMessage ||
         "انجام شد"
@@ -1456,11 +1416,6 @@ function connectSystems() {
 
     }
   );
-
-
-  /* -------------------------------------------------------
-     Missions → HUD
-  ------------------------------------------------------- */
 
   missionManager.on(
     "started",
@@ -1471,7 +1426,6 @@ function connectSystems() {
         return;
 
       }
-
 
       hudManager.notify(
         `ماموریت جدید: ${
@@ -1484,7 +1438,6 @@ function connectSystems() {
     }
   );
 
-
   missionManager.on(
     "completed",
     ({ mission }) => {
@@ -1494,7 +1447,6 @@ function connectSystems() {
         return;
 
       }
-
 
       hudManager.notify(
         `ماموریت کامل شد: ${
@@ -1507,11 +1459,6 @@ function connectSystems() {
     }
   );
 
-
-  /* -------------------------------------------------------
-     Save → HUD
-  ------------------------------------------------------- */
-
   saveManager.on(
     "saved",
     () => {
@@ -1523,7 +1470,6 @@ function connectSystems() {
     }
   );
 
-
   saveManager.on(
     "saveError",
     () => {
@@ -1534,11 +1480,6 @@ function connectSystems() {
 
     }
   );
-
-
-  /* -------------------------------------------------------
-     Weather
-  ------------------------------------------------------- */
 
   weatherSystem.on(
     "weatherChanged",
@@ -1566,13 +1507,11 @@ function hideMainMenu() {
       "main-menu"
     );
 
-
   if (!menu) {
 
     return;
 
   }
-
 
   menu.classList.add(
     "hidden"
@@ -1583,7 +1522,6 @@ function hideMainMenu() {
   );
 
 }
-
 
 function showMainMenu() {
 
@@ -1592,13 +1530,11 @@ function showMainMenu() {
       "main-menu"
     );
 
-
   if (!menu) {
 
     return;
 
   }
-
 
   menu.classList.remove(
     "hidden"
@@ -1610,7 +1546,6 @@ function showMainMenu() {
 
 }
 
-
 function hidePauseMenu() {
 
   const menu =
@@ -1618,20 +1553,17 @@ function hidePauseMenu() {
       "pause-menu"
     );
 
-
   if (!menu) {
 
     return;
 
   }
 
-
   menu.classList.add(
     "hidden"
   );
 
 }
-
 
 function showPauseMenu() {
 
@@ -1640,13 +1572,11 @@ function showPauseMenu() {
       "pause-menu"
     );
 
-
   if (!menu) {
 
     return;
 
   }
-
 
   menu.classList.remove(
     "hidden"
@@ -1667,7 +1597,6 @@ function startGameplay() {
 
   }
 
-
   app.running =
     true;
 
@@ -1677,18 +1606,15 @@ function startGameplay() {
   app.loading =
     false;
 
-
   gameState.set(
     "app.running",
     true
   );
 
-
   gameState.set(
     "app.paused",
     false
   );
-
 
   if (
     typeof rendererSystem.resume ===
@@ -1699,7 +1625,6 @@ function startGameplay() {
 
   }
 
-
   if (
     typeof inputManager.enable ===
     "function"
@@ -1709,7 +1634,6 @@ function startGameplay() {
 
   }
 
-
   hideMainMenu();
 
   hidePauseMenu();
@@ -1718,17 +1642,11 @@ function startGameplay() {
 
   hudManager.show();
 
-
   log(
     "Gameplay started."
   );
 
 }
-
-
-/* =========================================================
-   Pause
-========================================================= */
 
 function pauseGameplay() {
 
@@ -1738,16 +1656,13 @@ function pauseGameplay() {
 
   }
 
-
   app.paused =
     true;
-
 
   gameState.set(
     "app.paused",
     true
   );
-
 
   if (
     typeof rendererSystem.pause ===
@@ -1758,7 +1673,6 @@ function pauseGameplay() {
 
   }
 
-
   if (
     typeof inputManager.disable ===
     "function"
@@ -1768,20 +1682,13 @@ function pauseGameplay() {
 
   }
 
-
   showPauseMenu();
-
 
   log(
     "Gameplay paused."
   );
 
 }
-
-
-/* =========================================================
-   Resume
-========================================================= */
 
 function resumeGameplay() {
 
@@ -1791,16 +1698,13 @@ function resumeGameplay() {
 
   }
 
-
   app.paused =
     false;
-
 
   gameState.set(
     "app.paused",
     false
   );
-
 
   if (
     typeof rendererSystem.resume ===
@@ -1811,7 +1715,6 @@ function resumeGameplay() {
 
   }
 
-
   if (
     typeof inputManager.enable ===
     "function"
@@ -1821,20 +1724,13 @@ function resumeGameplay() {
 
   }
 
-
   hidePauseMenu();
-
 
   log(
     "Gameplay resumed."
   );
 
 }
-
-
-/* =========================================================
-   Stop Gameplay
-========================================================= */
 
 function stopGameplay() {
 
@@ -1844,18 +1740,15 @@ function stopGameplay() {
   app.paused =
     false;
 
-
   gameState.set(
     "app.running",
     false
   );
 
-
   gameState.set(
     "app.paused",
     false
   );
-
 
   if (
     typeof inputManager.disable ===
@@ -1866,11 +1759,9 @@ function stopGameplay() {
 
   }
 
-
   hidePauseMenu();
 
   hudManager.hide();
-
 
   log(
     "Gameplay stopped."
@@ -1891,24 +1782,17 @@ function update(deltaTime) {
 
   }
 
-
   if (app.paused) {
 
     return;
 
   }
 
-
   const dt =
     Math.min(
       Number(deltaTime) || 0,
       0.1
     );
-
-
-  /* -------------------------------------------------------
-     World
-  ------------------------------------------------------- */
 
   if (
     typeof worldSystem.update ===
@@ -1921,7 +1805,6 @@ function update(deltaTime) {
 
   }
 
-
   if (
     typeof terrainSystem.update ===
     "function"
@@ -1932,7 +1815,6 @@ function update(deltaTime) {
     );
 
   }
-
 
   if (
     typeof buildingsSystem.update ===
@@ -1945,7 +1827,6 @@ function update(deltaTime) {
 
   }
 
-
   if (
     typeof weatherSystem.update ===
     "function"
@@ -1957,34 +1838,21 @@ function update(deltaTime) {
 
   }
 
-
-  /* -------------------------------------------------------
-     Player
-  ------------------------------------------------------- */
-
   updatePlayerController(
     dt
   );
-
 
   updatePlayer(
     dt
   );
 
-
   updatePlayerAnimation(
     dt
   );
 
-
   updatePlayerCamera(
     dt
   );
-
-
-  /* -------------------------------------------------------
-     Gameplay
-  ------------------------------------------------------- */
 
   if (
     typeof missionManager.update ===
@@ -1996,7 +1864,6 @@ function update(deltaTime) {
     );
 
   }
-
 
   if (
     typeof interactionManager.update ===
@@ -2027,21 +1894,17 @@ function applicationLoop(
 
   }
 
-
   const delta =
     (timestamp -
       lastFrameTime) /
     1000;
 
-
   lastFrameTime =
     timestamp;
-
 
   update(
     delta
   );
-
 
   gameLoopId =
     requestAnimationFrame(
@@ -2049,11 +1912,6 @@ function applicationLoop(
     );
 
 }
-
-
-/* =========================================================
-   Start Main Loop
-========================================================= */
 
 function startMainLoop() {
 
@@ -2063,10 +1921,8 @@ function startMainLoop() {
 
   }
 
-
   lastFrameTime =
     0;
-
 
   gameLoopId =
     requestAnimationFrame(
@@ -2074,11 +1930,6 @@ function startMainLoop() {
     );
 
 }
-
-
-/* =========================================================
-   Stop Main Loop
-========================================================= */
 
 function stopMainLoop() {
 
@@ -2088,11 +1939,9 @@ function stopMainLoop() {
 
   }
 
-
   cancelAnimationFrame(
     gameLoopId
   );
-
 
   gameLoopId =
     null;
@@ -2112,35 +1961,26 @@ async function bootstrap() {
 
   }
 
-
   booted =
     true;
-
 
   showLoadingScreen(
     "در حال راه‌اندازی AZAD WORLD..."
   );
 
-
   try {
 
     await initializeCoreSystems();
 
-
     await initializeRendering();
-
 
     await initializeWorldSystems();
 
-
     await initializePlayerSystems();
-
 
     await initializeGameplaySystems();
 
-
     await initializeUISystems();
-
 
     connectSystems();
 
@@ -2148,14 +1988,8 @@ async function bootstrap() {
 
     connectDOMButtons();
 
-
-    /* -----------------------------------------------------
-       Check Authentication
-    ----------------------------------------------------- */
-
     const user =
       await refreshAuthenticationState();
-
 
     initialized =
       true;
@@ -2166,27 +2000,22 @@ async function bootstrap() {
     app.loading =
       false;
 
-
     gameState.set(
       "app.initialized",
       true
     );
-
 
     gameState.set(
       "app.loading",
       false
     );
 
-
     setLoadingProgress(
       100,
       "آماده ورود به بازی"
     );
 
-
     startMainLoop();
-
 
     if (
       typeof rendererSystem.start ===
@@ -2197,14 +2026,7 @@ async function bootstrap() {
 
     }
 
-
     hideLoadingScreen();
-
-
-    /*
-     * If already logged in,
-     * show the main menu.
-     */
 
     if (user) {
 
@@ -2222,7 +2044,6 @@ async function bootstrap() {
 
     }
 
-
     if (
       typeof saveManager.startAutosave ===
       "function"
@@ -2231,7 +2052,6 @@ async function bootstrap() {
       saveManager.startAutosave();
 
     }
-
 
     if (
       typeof menuManager.updateContinueButton ===
@@ -2242,11 +2062,9 @@ async function bootstrap() {
 
     }
 
-
     log(
       "AZAD WORLD initialized successfully."
     );
-
 
   } catch (error) {
 
@@ -2278,7 +2096,6 @@ if (
 
     }
   );
-
 
   window.addEventListener(
     "unhandledrejection",
@@ -2365,13 +2182,11 @@ export function getAppState() {
 
 }
 
-
 export function startGame() {
 
   startGameplay();
 
 }
-
 
 export function pauseGame() {
 
@@ -2379,20 +2194,17 @@ export function pauseGame() {
 
 }
 
-
 export function resumeGame() {
 
   resumeGameplay();
 
 }
 
-
 export function stopGame() {
 
   stopGameplay();
 
 }
-
 
 export function getSystems() {
 
@@ -2401,7 +2213,6 @@ export function getSystems() {
   ];
 
 }
-
 
 export function getAppSnapshot() {
 
@@ -2433,7 +2244,6 @@ export function getAppSnapshot() {
 
           }
 
-
           return {
 
             name:
@@ -2460,29 +2270,24 @@ export function debugGame() {
     "AZAD WORLD DEBUG"
   );
 
-
   console.log(
     "App:",
     getAppState()
   );
-
 
   console.log(
     "Game State:",
     gameState.snapshot()
   );
 
-
   console.log(
     "Systems:",
     getAppSnapshot()
   );
 
-
   console.groupEnd();
 
 }
-
 
 if (
   typeof window !== "undefined"
@@ -2517,7 +2322,6 @@ if (
   };
 
 }
-
 
 export default {
 
