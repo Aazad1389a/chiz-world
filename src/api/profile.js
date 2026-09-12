@@ -6,21 +6,26 @@ import {
   databaseUpdate
 } from "./supabase.js";
 
+import { authManager } from "./auth.js";
+
 /**
  * AZAD WORLD
  * Player Profile API
  *
  * مسئول:
- * - ساخت پروفایل بازیکن
+ * - ساخت خودکار پروفایل بعد از ورود/ثبت‌نام
  * - دریافت پروفایل
  * - بروزرسانی پروفایل
  * - ذخیره اطلاعات عمومی بازیکن
+ * - هماهنگ‌سازی وضعیت آنلاین
  */
 
 export class ProfileManager {
   constructor() {
     this.supabase = getSupabase();
     this.profile = null;
+    this.authUnsubscribe = null;
+    this.initialized = false;
   }
 
   async getProfile(userId = null) {
@@ -35,7 +40,6 @@ export class ProfileManager {
 
     try {
       const user = await getCurrentUser();
-
       const id = userId || user?.id;
 
       if (!id) {
@@ -75,7 +79,6 @@ export class ProfileManager {
         data: this.profile,
         exists: true
       };
-
     } catch (error) {
       console.error("[ProfileManager] getProfile:", error);
 
@@ -106,22 +109,26 @@ export class ProfileManager {
         };
       }
 
+      const metadata = user.user_metadata || {};
+
       const profile = {
         id: user.id,
 
         username:
           data.username ||
-          user.user_metadata?.username ||
+          metadata.username ||
           `Player_${user.id.slice(0, 8)}`,
 
         display_name:
           data.display_name ||
-          user.user_metadata?.display_name ||
+          metadata.display_name ||
+          data.username ||
+          metadata.username ||
           "Player",
 
-        avatar_url:
-          data.avatar_url ||
-          user.user_metadata?.avatar_url ||
+        avatar:
+          data.avatar ||
+          metadata.avatar ||
           null,
 
         level:
@@ -140,7 +147,7 @@ export class ProfileManager {
             : 0,
 
         online:
-          data.online === true,
+          data.online !== false,
 
         platform:
           data.platform ||
@@ -165,9 +172,9 @@ export class ProfileManager {
 
       return {
         ok: true,
-        data: this.profile
+        data: this.profile,
+        created: true
       };
-
     } catch (error) {
       console.error("[ProfileManager] createProfile:", error);
 
@@ -215,7 +222,7 @@ export class ProfileManager {
       const allowedFields = [
         "username",
         "display_name",
-        "avatar_url",
+        "avatar",
         "level",
         "experience",
         "coins",
@@ -255,7 +262,6 @@ export class ProfileManager {
         ok: true,
         data: this.profile
       };
-
     } catch (error) {
       console.error("[ProfileManager] updateProfile:", error);
 
@@ -271,6 +277,92 @@ export class ProfileManager {
       online: Boolean(online),
       last_seen: new Date().toISOString()
     });
+  }
+
+  async syncAuthenticatedProfile() {
+    try {
+      const user = await getCurrentUser();
+
+      if (!user) {
+        this.clearCache();
+        return {
+          ok: true,
+          data: null,
+          authenticated: false
+        };
+      }
+
+      const metadata = user.user_metadata || {};
+
+      const result = await this.getOrCreateProfile({
+        username: metadata.username,
+        display_name: metadata.display_name,
+        avatar: metadata.avatar,
+        online: true,
+        platform: this.detectPlatform()
+      });
+
+      if (!result.ok) {
+        console.error(
+          "[ProfileManager] Failed to sync authenticated profile:",
+          result.error
+        );
+        return result;
+      }
+
+      if (result.data) {
+        const updateResult = await this.updateProfile({
+          online: true,
+          platform: this.detectPlatform()
+        });
+
+        if (updateResult.ok) {
+          this.profile = updateResult.data;
+          return updateResult;
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.error(
+        "[ProfileManager] syncAuthenticatedProfile:",
+        error
+      );
+
+      return {
+        ok: false,
+        error:
+          error?.message ||
+          "Failed to synchronize authenticated profile."
+      };
+    }
+  }
+
+  startAuthSync() {
+    if (this.authUnsubscribe) {
+      return this;
+    }
+
+    if (
+      !authManager ||
+      typeof authManager.onChange !== "function"
+    ) {
+      return this;
+    }
+
+    this.authUnsubscribe = authManager.onChange(
+      async () => {
+        const user = await getCurrentUser();
+
+        if (user) {
+          await this.syncAuthenticatedProfile();
+        } else {
+          this.clearCache();
+        }
+      }
+    );
+
+    return this;
   }
 
   async addExperience(amount) {
@@ -298,17 +390,18 @@ export class ProfileManager {
     const newXP =
       Math.max(0, currentXP + Number(amount || 0));
 
-    const xpRequired =
-      this.getXPRequired(currentLevel);
-
     let level = currentLevel;
+    let remainingXP = newXP;
 
-    if (newXP >= xpRequired) {
+    while (
+      remainingXP >= this.getXPRequired(level)
+    ) {
+      remainingXP -= this.getXPRequired(level);
       level += 1;
     }
 
     return await this.updateProfile({
-      experience: newXP,
+      experience: remainingXP,
       level
     });
   }
@@ -353,36 +446,30 @@ export class ProfileManager {
   }
 
   detectPlatform() {
+    if (typeof navigator === "undefined") {
+      return "unknown";
+    }
+
     const ua =
       navigator.userAgent.toLowerCase();
 
-    if (
-      /android/.test(ua)
-    ) {
+    if (/android/.test(ua)) {
       return "android";
     }
 
-    if (
-      /iphone|ipad|ipod/.test(ua)
-    ) {
+    if (/iphone|ipad|ipod/.test(ua)) {
       return "ios";
     }
 
-    if (
-      /windows/.test(ua)
-    ) {
+    if (/windows/.test(ua)) {
       return "windows";
     }
 
-    if (
-      /macintosh|mac os/.test(ua)
-    ) {
+    if (/macintosh|mac os/.test(ua)) {
       return "macos";
     }
 
-    if (
-      /linux/.test(ua)
-    ) {
+    if (/linux/.test(ua)) {
       return "linux";
     }
 
@@ -398,22 +485,59 @@ export class ProfileManager {
   }
 
   async initialize(defaultData = {}) {
-    const result =
-      await this.getOrCreateProfile(defaultData);
-
-    if (result.ok && result.data) {
-      this.profile = result.data;
+    if (this.initialized) {
+      return {
+        ok: true,
+        data: this.profile
+      };
     }
 
-    return result;
+    this.initialized = true;
+    this.startAuthSync();
+
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return {
+        ok: true,
+        data: null,
+        authenticated: false
+      };
+    }
+
+    return await this.getOrCreateProfile({
+      ...defaultData,
+      username:
+        defaultData.username ||
+        user.user_metadata?.username,
+      display_name:
+        defaultData.display_name ||
+        user.user_metadata?.display_name,
+      online: true,
+      platform:
+        defaultData.platform ||
+        this.detectPlatform()
+    });
   }
 
   dispose() {
+    if (typeof this.authUnsubscribe === "function") {
+      this.authUnsubscribe();
+    }
+
+    this.authUnsubscribe = null;
     this.profile = null;
+    this.initialized = false;
   }
 }
 
 export const profileManager =
   new ProfileManager();
+
+/*
+ * Start listening immediately so profile creation is connected
+ * to authentication even when main.js has not initialized yet.
+ */
+profileManager.startAuthSync();
 
 export default profileManager;
