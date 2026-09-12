@@ -1461,3 +1461,405 @@ input:focus-visible {
     }
 
 }
+/* =========================================================
+   AZAD WORLD
+   Authentication UI
+   Login / Register
+========================================================= */
+
+#auth-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 24px;
+
+    background:
+        radial-gradient(
+            circle at 50% 35%,
+            rgba(30, 40, 55, 0.35),
+            rgba(3, 5, 8, 0.96) 65%
+        );
+
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+
+    transition:
+        opacity 0.25s ease,
+        visibility 0.25s ease;
+}
+
+#auth-screen.hidden {
+    display: none;
+}
+
+
+/* =========================================================
+   AUTH PANEL
+========================================================= */
+
+.auth-panel {
+    width: min(430px, 100%);
+
+    padding: 36px 32px 30px;
+
+    border: 1px solid rgba(255, 255, 255, 0.12);
+
+    border-radius: 18px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(18, 23, 31, 0.96),
+            rgba(7, 10, 15, 0.98)
+        );
+
+    box-shadow:
+        0 24px 70px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+    text-align: center;
+
+    animation:
+        authPanelIn 0.35s ease;
+}
+
+
+@keyframes authPanelIn {
+
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+}
+
+
+/* =========================================================
+   TITLE
+========================================================= */
+
+.auth-title {
+    margin: 0;
+
+    font-size: clamp(28px, 6vw, 40px);
+
+    font-weight: 800;
+
+    letter-spacing: 0.16em;
+
+    color: #ffffff;
+
+    text-shadow:
+        0 0 24px rgba(255, 255, 255, 0.12);
+}
+
+
+.auth-subtitle {
+    margin: 8px 0 28px;
+
+    font-size: 12px;
+
+    font-weight: 700;
+
+    letter-spacing: 0.3em;
+
+    color: rgba(255, 255, 255, 0.45);
+}
+
+
+/* =========================================================
+   FORM
+========================================================= */
+
+.auth-form {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 14px;
+
+    width: 100%;
+}
+
+
+.auth-field {
+    width: 100%;
+}
+
+
+.auth-field input {
+    box-sizing: border-box;
+
+    width: 100%;
+
+    height: 50px;
+
+    padding: 0 16px;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.12);
+
+    border-radius: 10px;
+
+    outline: none;
+
+    background:
+        rgba(255, 255, 255, 0.045);
+
+    color: #ffffff;
+
+    font-family: inherit;
+
+    font-size: 14px;
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+
+.auth-field input::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+
+.auth-field input:hover {
+    background:
+        rgba(255, 255, 255, 0.06);
+}
+
+
+.auth-field input:focus {
+    border-color:
+        rgba(255, 255, 255, 0.38);
+
+    background:
+        rgba(255, 255, 255, 0.075);
+
+    box-shadow:
+        0 0 0 3px rgba(255, 255, 255, 0.06);
+}
+
+
+/* =========================================================
+   BUTTONS
+========================================================= */
+
+.auth-form .menu-button,
+.auth-panel > .menu-button {
+    width: 100%;
+
+    min-height: 48px;
+
+    margin: 0;
+
+    border-radius: 10px;
+
+    cursor: pointer;
+
+    transition:
+        transform 0.15s ease,
+        opacity 0.15s ease,
+        background 0.15s ease;
+}
+
+
+.auth-form .menu-button:hover,
+.auth-panel > .menu-button:hover {
+    transform: translateY(-1px);
+}
+
+
+.auth-form .menu-button:active,
+.auth-panel > .menu-button:active {
+    transform: translateY(0);
+}
+
+
+.auth-form .menu-button:disabled,
+.auth-panel > .menu-button:disabled {
+    opacity: 0.55;
+
+    cursor: not-allowed;
+
+    transform: none;
+}
+
+
+/* =========================================================
+   AUTH MESSAGE
+========================================================= */
+
+.auth-message {
+    min-height: 20px;
+
+    margin: 2px 0 0;
+
+    font-size: 12px;
+
+    line-height: 1.5;
+
+    color: rgba(255, 255, 255, 0.65);
+
+    transition:
+        color 0.2s ease;
+}
+
+
+.auth-message:empty {
+    min-height: 4px;
+}
+
+
+.auth-message[data-type="error"] {
+    color: #ff7373;
+}
+
+
+.auth-message[data-type="success"] {
+    color: #78d99a;
+}
+
+
+/* =========================================================
+   LOGGED-IN USER
+========================================================= */
+
+.auth-user {
+    display: none;
+
+    margin: 12px 0 20px;
+
+    padding: 14px;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.1);
+
+    border-radius: 10px;
+
+    background:
+        rgba(255, 255, 255, 0.04);
+
+    color: rgba(255, 255, 255, 0.8);
+
+    font-size: 13px;
+
+    line-height: 1.5;
+
+    overflow-wrap: anywhere;
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 600px) {
+
+    #auth-screen {
+        padding: 16px;
+    }
+
+
+    .auth-panel {
+        padding:
+            30px 20px 24px;
+
+        border-radius: 15px;
+    }
+
+
+    .auth-title {
+        font-size: 30px;
+    }
+
+
+    .auth-subtitle {
+        margin-bottom: 22px;
+    }
+
+
+    .auth-field input {
+        height: 48px;
+
+        font-size: 14px;
+    }
+
+}
+
+
+/* =========================================================
+   SMALL PHONES / LANDSCAPE
+========================================================= */
+
+@media (
+    max-height: 600px
+) and (
+    orientation: landscape
+) {
+
+    #auth-screen {
+        align-items: flex-start;
+
+        overflow-y: auto;
+
+        padding:
+            18px 16px;
+    }
+
+
+    .auth-panel {
+        margin: auto;
+
+        padding:
+            22px 24px;
+    }
+
+
+    .auth-subtitle {
+        margin-bottom: 16px;
+    }
+
+
+    .auth-form {
+        gap: 10px;
+    }
+
+
+    .auth-field input {
+        height: 44px;
+    }
+
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+========================================================= */
+
+@media (
+    prefers-reduced-motion: reduce
+) {
+
+    #auth-screen,
+    .auth-panel,
+    .auth-field input,
+    .auth-form .menu-button,
+    .auth-panel > .menu-button {
+        animation: none;
+
+        transition: none;
+    }
+
+}
