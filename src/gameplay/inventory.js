@@ -89,7 +89,10 @@ function normalizeItem(item = {}) {
 
         maxStack: Math.max(
             1,
-            number(item.maxStack, DEFAULT_CONFIG.defaultMaxStack)
+            number(
+                item.maxStack,
+                DEFAULT_CONFIG.defaultMaxStack
+            )
         ),
 
         weight: Math.max(
@@ -771,6 +774,7 @@ class InventoryManager {
 
         return {
             ...clone(item),
+
             actions: {
                 use:
                     item.usable &&
@@ -1009,6 +1013,7 @@ class InventoryManager {
     }
 }
 
+
 // ======================================================
 // SINGLETON
 // ======================================================
@@ -1016,14 +1021,21 @@ class InventoryManager {
 export const inventoryManager =
     new InventoryManager();
 
+
 // ======================================================
-// HELPERS
+// INITIALIZATION HELPERS
 // ======================================================
 
+/**
+ * Initialize inventory system.
+ */
 export function initializeInventory(
     config = {}
 ) {
-    if (Object.keys(config).length > 0) {
+    if (
+        config &&
+        Object.keys(config).length > 0
+    ) {
         inventoryManager.config = {
             ...inventoryManager.config,
             ...config,
@@ -1032,6 +1044,29 @@ export function initializeInventory(
 
     return inventoryManager.initialize();
 }
+
+
+/**
+ * Compatibility initializer.
+ *
+ * main.js currently imports:
+ *
+ * initializeInventoryManager
+ *
+ * Keep this alias so both APIs work.
+ */
+export function initializeInventoryManager(
+    config = {}
+) {
+    return initializeInventory(
+        config
+    );
+}
+
+
+// ======================================================
+// INVENTORY HELPERS
+// ======================================================
 
 export function addInventoryItem(
     item,
@@ -1043,6 +1078,7 @@ export function addInventoryItem(
     );
 }
 
+
 export function removeInventoryItem(
     itemId,
     quantity
@@ -1052,6 +1088,7 @@ export function removeInventoryItem(
         quantity
     );
 }
+
 
 export function useInventoryItem(
     itemId,
@@ -1063,6 +1100,7 @@ export function useInventoryItem(
     );
 }
 
+
 export function equipInventoryItem(
     itemId,
     slot
@@ -1072,6 +1110,7 @@ export function equipInventoryItem(
         slot
     );
 }
+
 
 export function dropInventoryItem(
     itemId,
@@ -1085,13 +1124,24 @@ export function dropInventoryItem(
     );
 }
 
+
 export function getInventory() {
     return inventoryManager;
 }
+
+
+// ======================================================
+// CONSTANT EXPORTS
+// ======================================================
 
 export {
     ITEM_TYPES,
     ITEM_ACTIONS,
 };
+
+
+// ======================================================
+// DEFAULT EXPORT
+// ======================================================
 
 export default inventoryManager;
