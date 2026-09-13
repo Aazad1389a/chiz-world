@@ -315,48 +315,34 @@ const DEFAULT_STATE = {
 // DEEP CLONE
 // ------------------------------------------------------------
 //
-// The previous implementation used:
+// Safely clones state values.
 //
-// JSON.parse(JSON.stringify(value))
-//
-// That crashes when value is undefined because:
-// JSON.stringify(undefined) === undefined
-//
-// This implementation safely handles:
-// - undefined
-// - null
-// - primitive values
-// - arrays
-// - plain objects
-// - structuredClone-capable browsers
+// Important:
+// JSON.parse(JSON.stringify(undefined)) throws an error.
+// This implementation safely handles undefined and null.
 // ------------------------------------------------------------
 
 function clone(value) {
-  // undefined and null are valid state values.
   if (value === undefined || value === null) {
     return value;
   }
 
-  // Primitive values do not need cloning.
   if (typeof value !== "object") {
     return value;
   }
 
-  // Use native structuredClone when available.
   if (typeof structuredClone === "function") {
     try {
       return structuredClone(value);
     } catch {
-      // Fall back to the recursive clone below.
+      // Fall through to recursive cloning.
     }
   }
 
-  // Arrays.
   if (Array.isArray(value)) {
     return value.map((item) => clone(item));
   }
 
-  // Plain objects.
   const result = {};
 
   for (const [key, item] of Object.entries(value)) {
@@ -944,6 +930,22 @@ export class GameState {
       state: clone(this.state)
     };
   }
+
+  // ----------------------------------------------------------
+  // SNAPSHOT COMPATIBILITY
+  // ----------------------------------------------------------
+  //
+  // HUD and other systems use gameState.snapshot().
+  // Keep this method as a lightweight state snapshot API.
+  // ----------------------------------------------------------
+
+  snapshot() {
+    return clone(this.state);
+  }
+
+  // ----------------------------------------------------------
+  // RESTORE SNAPSHOT
+  // ----------------------------------------------------------
 
   restoreSnapshot(
     snapshot,
