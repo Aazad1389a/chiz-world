@@ -1,6 +1,6 @@
 import {
     createClient
-} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+} from "https://cdn.jsdelivr.net/npm/@Supabase/supabase-js@2/+esm";
 
 /*
  * AZAD WORLD
@@ -80,6 +80,13 @@ export function isSupabaseConfigured() {
 
 /**
  * Get current authenticated user.
+ *
+ * IMPORTANT:
+ * We use getSession() instead of getUser() here.
+ *
+ * getUser() can throw AuthSessionMissingError when nobody
+ * is logged in. A logged-out user is a normal state for
+ * AZAD WORLD, not an application error.
  */
 export async function getCurrentUser() {
     if (!supabase) {
@@ -90,19 +97,37 @@ export async function getCurrentUser() {
         const {
             data,
             error
-        } = await supabase.auth.getUser();
+        } = await supabase.auth.getSession();
 
         if (error) {
             console.error(
-                "Failed to get current user:",
+                "Failed to get auth session:",
                 error
             );
 
             return null;
         }
 
-        return data?.user ?? null;
+        return data?.session?.user ?? null;
     } catch (error) {
+        /*
+         * A missing session is expected when the player
+         * has not logged in yet.
+         *
+         * Do not spam the console with AuthSessionMissingError.
+         */
+        if (
+            error?.name ===
+                "AuthSessionMissingError" ||
+            error?.code ===
+                "AUTH_SESSION_MISSING" ||
+            String(error?.message ?? "")
+                .toLowerCase()
+                .includes("auth session missing")
+        ) {
+            return null;
+        }
+
         console.error(
             "Failed to get current user:",
             error
@@ -610,10 +635,6 @@ export async function remove(
 
 /* =========================================================
    DATABASE COMPATIBILITY API
-   =========================================================
-   
-   These aliases exist so older/newer AZAD WORLD modules
-   can use either naming convention.
    ========================================================= */
 
 /**
@@ -691,13 +712,6 @@ export async function databaseSelect(
 
 /**
  * Compatibility alias for database update.
- *
- * Supports:
- * databaseUpdate(
- *   "profiles",
- *   { coins: 100 },
- *   { id: userId }
- * )
  */
 export async function databaseUpdate(
     table,
