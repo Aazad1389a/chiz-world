@@ -1,3 +1,4 @@
+import "../core/renderer-loop-fix.js";
 import { profileManager } from "../api/profile.js";
 import { authManager } from "../api/auth.js";
 import { gameState } from "../core/game-state.js";
