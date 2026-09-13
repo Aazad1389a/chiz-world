@@ -1,21 +1,24 @@
+/**
+ * AZAD WORLD
+ * Supabase Client & API Layer
+ *
+ * Responsibilities:
+ * - Supabase client initialization
+ * - Authentication session helpers
+ * - Realtime channels
+ * - Presence
+ * - Database helpers
+ * - Edge Function helpers
+ * - Storage helpers
+ */
+
 import {
     createClient
-} from "https://cdn.jsdelivr.net/npm/@Supabase/supabase-js@2/+esm";
+} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-/*
- * AZAD WORLD
- * Multiplayer Backend Connection
- *
- * امکانات:
- * - Supabase connection
- * - Authentication
- * - Realtime
- * - Multiplayer channels
- * - Database access
- * - Storage
- * - Edge Functions
- * - Database compatibility helpers
- */
+/* =========================================================
+   CONFIG
+   ========================================================= */
 
 const SUPABASE_URL =
     "https://zfyxvvquukhqapujyygv.supabase.co";
@@ -23,71 +26,64 @@ const SUPABASE_URL =
 const SUPABASE_ANON_KEY =
     "sb_publishable_4Pn17itO540ZN5PCp05qaw_MkaZ-Dmo";
 
-const isConfigured =
-    SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
-    SUPABASE_ANON_KEY !== "YOUR_SUPABASE_ANON_KEY";
-
-let supabase = null;
-
-if (isConfigured) {
-    supabase = createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY,
-        {
-            auth: {
-                persistSession: true,
-                autoRefreshToken: true,
-                detectSessionInUrl: true
-            },
-
-            realtime: {
-                params: {
-                    eventsPerSecond: 20
-                }
-            }
-        }
-    );
-} else {
-    console.warn(
-        "AZAD WORLD: Supabase is not configured yet."
-    );
-}
-
-
 /* =========================================================
    CLIENT
    ========================================================= */
 
-/**
- * Return Supabase client.
- */
+let supabase = null;
+
+try {
+    if (
+        SUPABASE_URL &&
+        SUPABASE_ANON_KEY
+    ) {
+        supabase = createClient(
+            SUPABASE_URL,
+            SUPABASE_ANON_KEY,
+            {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true
+                },
+
+                realtime: {
+                    params: {
+                        eventsPerSecond: 20
+                    }
+                }
+            }
+        );
+    }
+} catch (error) {
+    console.error(
+        "[AZAD WORLD] Failed to initialize Supabase:",
+        error
+    );
+
+    supabase = null;
+}
+
+/* =========================================================
+   BASIC HELPERS
+   ========================================================= */
+
 export function getSupabase() {
     return supabase;
 }
 
-
-/**
- * Check whether Supabase is configured.
- */
 export function isSupabaseConfigured() {
-    return isConfigured;
+    return Boolean(
+        supabase &&
+        SUPABASE_URL &&
+        SUPABASE_ANON_KEY
+    );
 }
 
-
 /* =========================================================
-   AUTHENTICATION
+   AUTH
    ========================================================= */
 
-/**
- * Get current authenticated user.
- *
- * IMPORTANT:
- * We use getSession() instead of getUser() here.
- *
- * getUser() can throw AuthSessionMissingError when nobody
- * is logged in. A logged-out user is a normal state for
- * AZAD WORLD, not an application error.
- */
 export async function getCurrentUser() {
     if (!supabase) {
         return null;
@@ -100,22 +96,37 @@ export async function getCurrentUser() {
         } = await supabase.auth.getSession();
 
         if (error) {
+            /*
+             * No active session is a normal state
+             * when the player has not logged in yet.
+             */
+            if (
+                error?.name ===
+                    "AuthSessionMissingError" ||
+                error?.code ===
+                    "AUTH_SESSION_MISSING" ||
+                String(error?.message ?? "")
+                    .toLowerCase()
+                    .includes(
+                        "auth session missing"
+                    )
+            ) {
+                return null;
+            }
+
             console.error(
-                "Failed to get auth session:",
+                "[AZAD WORLD] Failed to get auth session:",
                 error
             );
 
             return null;
         }
 
-        return data?.session?.user ?? null;
+        return (
+            data?.session?.user ??
+            null
+        );
     } catch (error) {
-        /*
-         * A missing session is expected when the player
-         * has not logged in yet.
-         *
-         * Do not spam the console with AuthSessionMissingError.
-         */
         if (
             error?.name ===
                 "AuthSessionMissingError" ||
@@ -123,13 +134,15 @@ export async function getCurrentUser() {
                 "AUTH_SESSION_MISSING" ||
             String(error?.message ?? "")
                 .toLowerCase()
-                .includes("auth session missing")
+                .includes(
+                    "auth session missing"
+                )
         ) {
             return null;
         }
 
         console.error(
-            "Failed to get current user:",
+            "[AZAD WORLD] Failed to get current user:",
             error
         );
 
@@ -137,10 +150,6 @@ export async function getCurrentUser() {
     }
 }
 
-
-/**
- * Get current session.
- */
 export async function getSession() {
     if (!supabase) {
         return null;
@@ -153,8 +162,22 @@ export async function getSession() {
         } = await supabase.auth.getSession();
 
         if (error) {
+            if (
+                error?.name ===
+                    "AuthSessionMissingError" ||
+                error?.code ===
+                    "AUTH_SESSION_MISSING" ||
+                String(error?.message ?? "")
+                    .toLowerCase()
+                    .includes(
+                        "auth session missing"
+                    )
+            ) {
+                return null;
+            }
+
             console.error(
-                "Failed to get session:",
+                "[AZAD WORLD] Failed to get session:",
                 error
             );
 
@@ -163,8 +186,22 @@ export async function getSession() {
 
         return data?.session ?? null;
     } catch (error) {
+        if (
+            error?.name ===
+                "AuthSessionMissingError" ||
+            error?.code ===
+                "AUTH_SESSION_MISSING" ||
+            String(error?.message ?? "")
+                .toLowerCase()
+                .includes(
+                    "auth session missing"
+                )
+        ) {
+            return null;
+        }
+
         console.error(
-            "Failed to get session:",
+            "[AZAD WORLD] Failed to get session:",
             error
         );
 
@@ -172,208 +209,116 @@ export async function getSession() {
     }
 }
 
-
-/**
- * Listen for authentication changes.
- */
 export function onAuthStateChange(callback) {
-    if (!supabase) {
+    if (
+        !supabase ||
+        typeof callback !== "function"
+    ) {
         return {
-            unsubscribe() {}
+            data: {
+                subscription: {
+                    unsubscribe() {}
+                }
+            }
         };
     }
 
-    const {
-        data
-    } = supabase.auth.onAuthStateChange(
-        (event, session) => {
-            if (typeof callback === "function") {
-                callback(
-                    event,
-                    session
-                );
-            }
-        }
+    return supabase.auth.onAuthStateChange(
+        callback
     );
-
-    return data.subscription;
 }
-
 
 /* =========================================================
    REALTIME CHANNELS
    ========================================================= */
 
-/**
- * Create a Realtime game channel.
- */
 export function createGameChannel(
     channelName,
     options = {}
 ) {
     if (!supabase) {
-        console.warn(
-            "Supabase is not configured."
-        );
-
         return null;
     }
 
     return supabase.channel(
         channelName,
-        {
-            config: {
-                broadcast: {
-                    self:
-                        options.broadcastSelf ??
-                        false
-                },
-
-                presence: {
-                    key:
-                        options.presenceKey ??
-                        undefined
-                }
-            }
-        }
+        options
     );
 }
 
-
-/**
- * Join a Realtime channel.
- */
 export async function joinChannel(
-    channel,
-    callback
-) {
-    if (!channel) {
-        return {
-            success: false,
-            error: "Channel does not exist."
-        };
-    }
-
-    return new Promise(
-        (resolve) => {
-            let settled = false;
-
-            channel.subscribe(
-                (status, error) => {
-                    if (
-                        typeof callback ===
-                        "function"
-                    ) {
-                        callback(
-                            status,
-                            error
-                        );
-                    }
-
-                    if (
-                        status ===
-                        "SUBSCRIBED"
-                    ) {
-                        if (!settled) {
-                            settled = true;
-
-                            resolve({
-                                success: true,
-                                error: null
-                            });
-                        }
-
-                        return;
-                    }
-
-                    if (
-                        status ===
-                            "CHANNEL_ERROR" ||
-                        status ===
-                            "TIMED_OUT"
-                    ) {
-                        if (!settled) {
-                            settled = true;
-
-                            resolve({
-                                success: false,
-                                error:
-                                    error ??
-                                    status
-                            });
-                        }
-                    }
-                }
-            );
-        }
-    );
-}
-
-
-/**
- * Leave a Realtime channel.
- */
-export async function leaveChannel(
     channel
 ) {
-    if (!supabase || !channel) {
-        return;
+    if (!channel) {
+        return null;
     }
 
     try {
-        await supabase.removeChannel(
-            channel
-        );
+        return await channel.subscribe();
     } catch (error) {
         console.error(
-            "Failed to leave channel:",
+            "[AZAD WORLD] Failed to join channel:",
             error
         );
+
+        return null;
     }
 }
 
+export async function leaveChannel(
+    channel
+) {
+    if (!channel) {
+        return null;
+    }
 
-/**
- * Send Realtime broadcast.
- */
-export async function broadcast(
+    try {
+        return await channel.unsubscribe();
+    } catch (error) {
+        console.error(
+            "[AZAD WORLD] Failed to leave channel:",
+            error
+        );
+
+        return null;
+    }
+}
+
+export function broadcast(
     channel,
     event,
     payload
 ) {
     if (!channel) {
-        return false;
+        return Promise.resolve(null);
     }
 
     try {
-        await channel.send({
+        return channel.send({
             type: "broadcast",
             event,
             payload
         });
-
-        return true;
     } catch (error) {
         console.error(
-            `Broadcast failed: ${event}`,
+            "[AZAD WORLD] Broadcast failed:",
             error
         );
 
-        return false;
+        return Promise.resolve(null);
     }
 }
 
-
-/**
- * Listen for Realtime broadcast.
- */
 export function onBroadcast(
     channel,
     event,
     callback
 ) {
-    if (!channel) {
-        return null;
+    if (
+        !channel ||
+        typeof callback !== "function"
+    ) {
+        return channel;
     }
 
     channel.on(
@@ -381,195 +326,74 @@ export function onBroadcast(
         {
             event
         },
-        ({ payload }) => {
-            if (
-                typeof callback ===
-                "function"
-            ) {
-                callback(
-                    payload
-                );
-            }
+        payload => {
+            callback(
+                payload?.payload ??
+                payload
+            );
         }
     );
 
     return channel;
 }
 
+/* =========================================================
+   PRESENCE
+   ========================================================= */
 
-/**
- * Track player presence.
- */
-export async function trackPresence(
+export function trackPresence(
     channel,
-    playerData
+    state
 ) {
     if (!channel) {
-        return false;
+        return Promise.resolve(null);
     }
 
     try {
-        await channel.track(
-            playerData
-        );
-
-        return true;
+        return channel.track(state);
     } catch (error) {
         console.error(
-            "Presence tracking failed:",
+            "[AZAD WORLD] Presence tracking failed:",
             error
         );
 
-        return false;
+        return Promise.resolve(null);
     }
 }
 
-
-/**
- * Listen for presence events.
- */
 export function onPresence(
     channel,
-    callbacks = {}
+    event,
+    callback
 ) {
-    if (!channel) {
-        return null;
+    if (
+        !channel ||
+        typeof callback !== "function"
+    ) {
+        return channel;
     }
 
-    if (
-        typeof callbacks.sync ===
-        "function"
-    ) {
-        channel.on(
-            "presence",
-            {
-                event: "sync"
-            },
-            () => {
-                callbacks.sync(
-                    channel.presenceState()
-                );
-            }
-        );
-    }
-
-    if (
-        typeof callbacks.join ===
-        "function"
-    ) {
-        channel.on(
-            "presence",
-            {
-                event: "join"
-            },
-            ({
-                key,
-                newPresences
-            }) => {
-                callbacks.join(
-                    key,
-                    newPresences
-                );
-            }
-        );
-    }
-
-    if (
-        typeof callbacks.leave ===
-        "function"
-    ) {
-        channel.on(
-            "presence",
-            {
-                event: "leave"
-            },
-            ({
-                key,
-                leftPresences
-            }) => {
-                callbacks.leave(
-                    key,
-                    leftPresences
-                );
-            }
-        );
-    }
+    channel.on(
+        "presence",
+        {
+            event
+        },
+        payload => {
+            callback(payload);
+        }
+    );
 
     return channel;
 }
-
 
 /* =========================================================
    DATABASE
    ========================================================= */
 
-/**
- * Insert data into a Supabase table.
- */
 export async function insert(
     table,
-    values
-) {
-    if (!supabase) {
-        return {
-            data: null,
-            error: new Error(
-                "Supabase is not configured."
-            )
-        };
-    }
-
-    try {
-        return await supabase
-            .from(table)
-            .insert(values)
-            .select();
-    } catch (error) {
-        return {
-            data: null,
-            error
-        };
-    }
-}
-
-
-/**
- * Select data from a table.
- */
-export async function select(
-    table,
-    columns = "*"
-) {
-    if (!supabase) {
-        return {
-            data: null,
-            error: new Error(
-                "Supabase is not configured."
-            )
-        };
-    }
-
-    try {
-        return await supabase
-            .from(table)
-            .select(columns);
-    } catch (error) {
-        return {
-            data: null,
-            error
-        };
-    }
-}
-
-
-/**
- * Update data in a Supabase table.
- */
-export async function update(
-    table,
     values,
-    filterColumn,
-    filterValue
+    options = {}
 ) {
     if (!supabase) {
         return {
@@ -581,127 +405,27 @@ export async function update(
     }
 
     try {
-        return await supabase
+        let query = supabase
             .from(table)
-            .update(values)
-            .eq(
-                filterColumn,
-                filterValue
-            )
-            .select();
-    } catch (error) {
-        return {
-            data: null,
-            error
-        };
-    }
-}
+            .insert(values);
 
+        if (options.select) {
+            query = query.select(
+                options.select
+            );
+        }
 
-/**
- * Delete data from a table.
- */
-export async function remove(
-    table,
-    filterColumn,
-    filterValue
-) {
-    if (!supabase) {
-        return {
-            data: null,
-            error: new Error(
-                "Supabase is not configured."
-            )
-        };
-    }
-
-    try {
-        return await supabase
-            .from(table)
-            .delete()
-            .eq(
-                filterColumn,
-                filterValue
-            )
-            .select();
-    } catch (error) {
-        return {
-            data: null,
-            error
-        };
-    }
-}
-
-
-/* =========================================================
-   DATABASE COMPATIBILITY API
-   ========================================================= */
-
-/**
- * Compatibility alias for database insert.
- */
-export async function databaseInsert(
-    table,
-    values
-) {
-    return insert(
-        table,
-        values
-    );
-}
-
-
-/**
- * Compatibility alias for database select.
- */
-export async function databaseSelect(
-    table,
-    columns = "*",
-    filters = null
-) {
-    if (!supabase) {
-        return {
-            data: null,
-            error: new Error(
-                "Supabase is not configured."
-            )
-        };
-    }
-
-    try {
-        let query =
-            supabase
-                .from(table)
-                .select(columns);
-
-        if (
-            filters &&
-            typeof filters === "object"
-        ) {
-            for (
-                const [
-                    column,
-                    value
-                ] of Object.entries(filters)
-            ) {
-                if (
-                    Array.isArray(value)
-                ) {
-                    query = query.in(
-                        column,
-                        value
-                    );
-                } else {
-                    query = query.eq(
-                        column,
-                        value
-                    );
-                }
-            }
+        if (options.single) {
+            query = query.single();
         }
 
         return await query;
     } catch (error) {
+        console.error(
+            "[AZAD WORLD] Database insert failed:",
+            error
+        );
+
         return {
             data: null,
             error
@@ -709,134 +433,267 @@ export async function databaseSelect(
     }
 }
 
+export async function select(
+    table,
+    columns = "*",
+    filters = {},
+    options = {}
+) {
+    if (!supabase) {
+        return {
+            data: null,
+            error: new Error(
+                "Supabase is not configured."
+            )
+        };
+    }
 
-/**
- * Compatibility alias for database update.
- */
+    try {
+        let query = supabase
+            .from(table)
+            .select(columns);
+
+        for (
+            const [key, value]
+            of Object.entries(filters)
+        ) {
+            if (
+                value === null ||
+                value === undefined
+            ) {
+                continue;
+            }
+
+            query = query.eq(
+                key,
+                value
+            );
+        }
+
+        if (options.order) {
+            query = query.order(
+                options.order.column,
+                {
+                    ascending:
+                        options.order.ascending ??
+                        true
+                }
+            );
+        }
+
+        if (
+            Number.isInteger(
+                options.limit
+            )
+        ) {
+            query = query.limit(
+                options.limit
+            );
+        }
+
+        if (options.single) {
+            query = query.single();
+        }
+
+        return await query;
+    } catch (error) {
+        console.error(
+            "[AZAD WORLD] Database select failed:",
+            error
+        );
+
+        return {
+            data: null,
+            error
+        };
+    }
+}
+
+export async function update(
+    table,
+    values,
+    filters = {},
+    options = {}
+) {
+    if (!supabase) {
+        return {
+            data: null,
+            error: new Error(
+                "Supabase is not configured."
+            )
+        };
+    }
+
+    try {
+        let query = supabase
+            .from(table)
+            .update(values);
+
+        for (
+            const [key, value]
+            of Object.entries(filters)
+        ) {
+            if (
+                value === null ||
+                value === undefined
+            ) {
+                continue;
+            }
+
+            query = query.eq(
+                key,
+                value
+            );
+        }
+
+        if (options.select) {
+            query = query.select(
+                options.select
+            );
+        }
+
+        if (options.single) {
+            query = query.single();
+        }
+
+        return await query;
+    } catch (error) {
+        console.error(
+            "[AZAD WORLD] Database update failed:",
+            error
+        );
+
+        return {
+            data: null,
+            error
+        };
+    }
+}
+
+export async function remove(
+    table,
+    filters = {},
+    options = {}
+) {
+    if (!supabase) {
+        return {
+            data: null,
+            error: new Error(
+                "Supabase is not configured."
+            )
+        };
+    }
+
+    try {
+        let query = supabase
+            .from(table)
+            .delete();
+
+        for (
+            const [key, value]
+            of Object.entries(filters)
+        ) {
+            if (
+                value === null ||
+                value === undefined
+            ) {
+                continue;
+            }
+
+            query = query.eq(
+                key,
+                value
+            );
+        }
+
+        if (options.select) {
+            query = query.select(
+                options.select
+            );
+        }
+
+        if (options.single) {
+            query = query.single();
+        }
+
+        return await query;
+    } catch (error) {
+        console.error(
+            "[AZAD WORLD] Database delete failed:",
+            error
+        );
+
+        return {
+            data: null,
+            error
+        };
+    }
+}
+
+/* =========================================================
+   DATABASE COMPATIBILITY HELPERS
+   ========================================================= */
+
+export async function databaseInsert(
+    table,
+    values,
+    options = {}
+) {
+    return insert(
+        table,
+        values,
+        options
+    );
+}
+
+export async function databaseSelect(
+    table,
+    columns = "*",
+    filters = {},
+    options = {}
+) {
+    return select(
+        table,
+        columns,
+        filters,
+        options
+    );
+}
+
 export async function databaseUpdate(
     table,
     values,
-    filters = null
+    filters = {},
+    options = {}
 ) {
-    if (!supabase) {
-        return {
-            data: null,
-            error: new Error(
-                "Supabase is not configured."
-            )
-        };
-    }
-
-    try {
-        let query =
-            supabase
-                .from(table)
-                .update(values);
-
-        if (
-            filters &&
-            typeof filters === "object"
-        ) {
-            for (
-                const [
-                    column,
-                    value
-                ] of Object.entries(filters)
-            ) {
-                if (
-                    Array.isArray(value)
-                ) {
-                    query = query.in(
-                        column,
-                        value
-                    );
-                } else {
-                    query = query.eq(
-                        column,
-                        value
-                    );
-                }
-            }
-        }
-
-        return await query.select();
-    } catch (error) {
-        return {
-            data: null,
-            error
-        };
-    }
+    return update(
+        table,
+        values,
+        filters,
+        options
+    );
 }
 
-
-/**
- * Compatibility alias for database delete.
- */
 export async function databaseDelete(
     table,
-    filters = null
+    filters = {},
+    options = {}
 ) {
-    if (!supabase) {
-        return {
-            data: null,
-            error: new Error(
-                "Supabase is not configured."
-            )
-        };
-    }
-
-    try {
-        let query =
-            supabase
-                .from(table)
-                .delete();
-
-        if (
-            filters &&
-            typeof filters === "object"
-        ) {
-            for (
-                const [
-                    column,
-                    value
-                ] of Object.entries(filters)
-            ) {
-                if (
-                    Array.isArray(value)
-                ) {
-                    query = query.in(
-                        column,
-                        value
-                    );
-                } else {
-                    query = query.eq(
-                        column,
-                        value
-                    );
-                }
-            }
-        }
-
-        return await query.select();
-    } catch (error) {
-        return {
-            data: null,
-            error
-        };
-    }
+    return remove(
+        table,
+        filters,
+        options
+    );
 }
-
 
 /* =========================================================
    EDGE FUNCTIONS
    ========================================================= */
 
-/**
- * Call a Supabase Edge Function.
- */
 export async function invokeFunction(
     functionName,
-    body = {}
+    body = {},
+    options = {}
 ) {
     if (!supabase) {
         return {
@@ -851,10 +708,16 @@ export async function invokeFunction(
         return await supabase.functions.invoke(
             functionName,
             {
-                body
+                body,
+                ...options
             }
         );
     } catch (error) {
+        console.error(
+            "[AZAD WORLD] Edge Function failed:",
+            error
+        );
+
         return {
             data: null,
             error
@@ -862,14 +725,10 @@ export async function invokeFunction(
     }
 }
 
-
 /* =========================================================
    STORAGE
    ========================================================= */
 
-/**
- * Get a public Storage URL.
- */
 export function getPublicStorageUrl(
     bucket,
     path
@@ -891,7 +750,7 @@ export function getPublicStorageUrl(
         );
     } catch (error) {
         console.error(
-            "Failed to get Storage URL:",
+            "[AZAD WORLD] Storage URL failed:",
             error
         );
 
@@ -899,45 +758,45 @@ export function getPublicStorageUrl(
     }
 }
 
-
 /* =========================================================
    BACKEND STATUS
    ========================================================= */
 
-/**
- * Get backend status.
- */
-export function getBackendStatus() {
-    return {
-        configured:
-            isConfigured,
+export async function getBackendStatus() {
+    if (!supabase) {
+        return {
+            configured: false,
+            connected: false,
+            authenticated: false
+        };
+    }
 
-        connected:
-            Boolean(supabase),
+    try {
+        const session =
+            await getSession();
 
-        realtime:
-            Boolean(
-                supabase?.realtime
-            ),
-
-        authentication:
-            Boolean(
-                supabase?.auth
-            ),
-
-        database:
-            Boolean(supabase),
-
-        storage:
-            Boolean(
-                supabase?.storage
-            )
-    };
+        return {
+            configured: true,
+            connected: true,
+            authenticated:
+                Boolean(session)
+        };
+    } catch (error) {
+        return {
+            configured: true,
+            connected: false,
+            authenticated: false,
+            error
+        };
+    }
 }
-
 
 /* =========================================================
    DEFAULT EXPORT
    ========================================================= */
+
+export {
+    supabase
+};
 
 export default supabase;
