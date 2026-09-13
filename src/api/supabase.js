@@ -1,24 +1,27 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import {
+    createClient
+} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 /*
  * AZAD WORLD
  * Multiplayer Backend Connection
  *
- * امکانات پایه:
+ * امکانات:
  * - Supabase connection
  * - Authentication
  * - Realtime
  * - Multiplayer channels
  * - Database access
- * - Secure configuration
- *
- * IMPORTANT:
- * مقدارهای SUPABASE_URL و SUPABASE_ANON_KEY
- * را بعداً با اطلاعات پروژه خودت جایگزین کن.
+ * - Storage
+ * - Edge Functions
+ * - Database compatibility helpers
  */
 
-const SUPABASE_URL = "https://zfyxvvquukhqapujyygv.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_4Pn17itO540ZN5PCp05qaw_MkaZ-Dmo";
+const SUPABASE_URL =
+    "https://zfyxvvquukhqapujyygv.supabase.co";
+
+const SUPABASE_ANON_KEY =
+    "sb_publishable_4Pn17itO540ZN5PCp05qaw_MkaZ-Dmo";
 
 const isConfigured =
     SUPABASE_URL !== "YOUR_SUPABASE_URL" &&
@@ -50,6 +53,11 @@ if (isConfigured) {
     );
 }
 
+
+/* =========================================================
+   CLIENT
+   ========================================================= */
+
 /**
  * Return Supabase client.
  */
@@ -57,25 +65,44 @@ export function getSupabase() {
     return supabase;
 }
 
+
 /**
- * Check whether backend is configured.
+ * Check whether Supabase is configured.
  */
 export function isSupabaseConfigured() {
     return isConfigured;
 }
 
+
+/* =========================================================
+   AUTHENTICATION
+   ========================================================= */
+
 /**
  * Get current authenticated user.
  */
 export async function getCurrentUser() {
-    if (!supabase) return null;
+    if (!supabase) {
+        return null;
+    }
 
-    const {
-        data,
-        error
-    } = await supabase.auth.getUser();
+    try {
+        const {
+            data,
+            error
+        } = await supabase.auth.getUser();
 
-    if (error) {
+        if (error) {
+            console.error(
+                "Failed to get current user:",
+                error
+            );
+
+            return null;
+        }
+
+        return data?.user ?? null;
+    } catch (error) {
         console.error(
             "Failed to get current user:",
             error
@@ -83,22 +110,34 @@ export async function getCurrentUser() {
 
         return null;
     }
-
-    return data?.user ?? null;
 }
+
 
 /**
  * Get current session.
  */
 export async function getSession() {
-    if (!supabase) return null;
+    if (!supabase) {
+        return null;
+    }
 
-    const {
-        data,
-        error
-    } = await supabase.auth.getSession();
+    try {
+        const {
+            data,
+            error
+        } = await supabase.auth.getSession();
 
-    if (error) {
+        if (error) {
+            console.error(
+                "Failed to get session:",
+                error
+            );
+
+            return null;
+        }
+
+        return data?.session ?? null;
+    } catch (error) {
         console.error(
             "Failed to get session:",
             error
@@ -106,9 +145,8 @@ export async function getSession() {
 
         return null;
     }
-
-    return data?.session ?? null;
 }
+
 
 /**
  * Listen for authentication changes.
@@ -136,13 +174,13 @@ export function onAuthStateChange(callback) {
     return data.subscription;
 }
 
+
+/* =========================================================
+   REALTIME CHANNELS
+   ========================================================= */
+
 /**
- * Create a Realtime channel.
- *
- * Example:
- *
- * const channel =
- *     createGameChannel("room-001");
+ * Create a Realtime game channel.
  */
 export function createGameChannel(
     channelName,
@@ -176,8 +214,9 @@ export function createGameChannel(
     );
 }
 
+
 /**
- * Join a multiplayer channel.
+ * Join a Realtime channel.
  */
 export async function joinChannel(
     channel,
@@ -192,6 +231,8 @@ export async function joinChannel(
 
     return new Promise(
         (resolve) => {
+            let settled = false;
+
             channel.subscribe(
                 (status, error) => {
                     if (
@@ -208,26 +249,34 @@ export async function joinChannel(
                         status ===
                         "SUBSCRIBED"
                     ) {
-                        resolve({
-                            success: true,
-                            error: null
-                        });
+                        if (!settled) {
+                            settled = true;
+
+                            resolve({
+                                success: true,
+                                error: null
+                            });
+                        }
 
                         return;
                     }
 
                     if (
                         status ===
-                        "CHANNEL_ERROR" ||
+                            "CHANNEL_ERROR" ||
                         status ===
-                        "TIMED_OUT"
+                            "TIMED_OUT"
                     ) {
-                        resolve({
-                            success: false,
-                            error:
-                                error ??
-                                status
-                        });
+                        if (!settled) {
+                            settled = true;
+
+                            resolve({
+                                success: false,
+                                error:
+                                    error ??
+                                    status
+                            });
+                        }
                     }
                 }
             );
@@ -235,8 +284,9 @@ export async function joinChannel(
     );
 }
 
+
 /**
- * Leave a multiplayer channel.
+ * Leave a Realtime channel.
  */
 export async function leaveChannel(
     channel
@@ -257,15 +307,9 @@ export async function leaveChannel(
     }
 }
 
+
 /**
- * Send a realtime event.
- *
- * Useful for:
- * - Player movement
- * - Shooting state
- * - Animations
- * - Emotes
- * - Game events
+ * Send Realtime broadcast.
  */
 export async function broadcast(
     channel,
@@ -279,9 +323,7 @@ export async function broadcast(
     try {
         await channel.send({
             type: "broadcast",
-
             event,
-
             payload
         });
 
@@ -296,8 +338,9 @@ export async function broadcast(
     }
 }
 
+
 /**
- * Listen for a broadcast event.
+ * Listen for Realtime broadcast.
  */
 export function onBroadcast(
     channel,
@@ -328,8 +371,9 @@ export function onBroadcast(
     return channel;
 }
 
+
 /**
- * Track a player's online presence.
+ * Track player presence.
  */
 export async function trackPresence(
     channel,
@@ -355,15 +399,17 @@ export async function trackPresence(
     }
 }
 
+
 /**
- * Listen for players joining/leaving
- * the current multiplayer room.
+ * Listen for presence events.
  */
 export function onPresence(
     channel,
     callbacks = {}
 ) {
-    if (!channel) return null;
+    if (!channel) {
+        return null;
+    }
 
     if (
         typeof callbacks.sync ===
@@ -391,7 +437,10 @@ export function onPresence(
             {
                 event: "join"
             },
-            ({ key, newPresences }) => {
+            ({
+                key,
+                newPresences
+            }) => {
                 callbacks.join(
                     key,
                     newPresences
@@ -409,7 +458,10 @@ export function onPresence(
             {
                 event: "leave"
             },
-            ({ key, leftPresences }) => {
+            ({
+                key,
+                leftPresences
+            }) => {
                 callbacks.leave(
                     key,
                     leftPresences
@@ -421,6 +473,11 @@ export function onPresence(
     return channel;
 }
 
+
+/* =========================================================
+   DATABASE
+   ========================================================= */
+
 /**
  * Insert data into a Supabase table.
  */
@@ -431,18 +488,25 @@ export async function insert(
     if (!supabase) {
         return {
             data: null,
-            error:
-                new Error(
-                    "Supabase is not configured."
-                )
+            error: new Error(
+                "Supabase is not configured."
+            )
         };
     }
 
-    return await supabase
-        .from(table)
-        .insert(values)
-        .select();
+    try {
+        return await supabase
+            .from(table)
+            .insert(values)
+            .select();
+    } catch (error) {
+        return {
+            data: null,
+            error
+        };
+    }
 }
+
 
 /**
  * Select data from a table.
@@ -454,20 +518,27 @@ export async function select(
     if (!supabase) {
         return {
             data: null,
-            error:
-                new Error(
-                    "Supabase is not configured."
-                )
+            error: new Error(
+                "Supabase is not configured."
+            )
         };
     }
 
-    return await supabase
-        .from(table)
-        .select(columns);
+    try {
+        return await supabase
+            .from(table)
+            .select(columns);
+    } catch (error) {
+        return {
+            data: null,
+            error
+        };
+    }
 }
 
+
 /**
- * Update data in a table.
+ * Update data in a Supabase table.
  */
 export async function update(
     table,
@@ -478,22 +549,29 @@ export async function update(
     if (!supabase) {
         return {
             data: null,
-            error:
-                new Error(
-                    "Supabase is not configured."
-                )
+            error: new Error(
+                "Supabase is not configured."
+            )
         };
     }
 
-    return await supabase
-        .from(table)
-        .update(values)
-        .eq(
-            filterColumn,
-            filterValue
-        )
-        .select();
+    try {
+        return await supabase
+            .from(table)
+            .update(values)
+            .eq(
+                filterColumn,
+                filterValue
+            )
+            .select();
+    } catch (error) {
+        return {
+            data: null,
+            error
+        };
+    }
 }
+
 
 /**
  * Delete data from a table.
@@ -506,22 +584,238 @@ export async function remove(
     if (!supabase) {
         return {
             data: null,
-            error:
-                new Error(
-                    "Supabase is not configured."
-                )
+            error: new Error(
+                "Supabase is not configured."
+            )
         };
     }
 
-    return await supabase
-        .from(table)
-        .delete()
-        .eq(
-            filterColumn,
-            filterValue
-        )
-        .select();
+    try {
+        return await supabase
+            .from(table)
+            .delete()
+            .eq(
+                filterColumn,
+                filterValue
+            )
+            .select();
+    } catch (error) {
+        return {
+            data: null,
+            error
+        };
+    }
 }
+
+
+/* =========================================================
+   DATABASE COMPATIBILITY API
+   =========================================================
+   
+   These aliases exist so older/newer AZAD WORLD modules
+   can use either naming convention.
+   ========================================================= */
+
+/**
+ * Compatibility alias for database insert.
+ */
+export async function databaseInsert(
+    table,
+    values
+) {
+    return insert(
+        table,
+        values
+    );
+}
+
+
+/**
+ * Compatibility alias for database select.
+ */
+export async function databaseSelect(
+    table,
+    columns = "*",
+    filters = null
+) {
+    if (!supabase) {
+        return {
+            data: null,
+            error: new Error(
+                "Supabase is not configured."
+            )
+        };
+    }
+
+    try {
+        let query =
+            supabase
+                .from(table)
+                .select(columns);
+
+        if (
+            filters &&
+            typeof filters === "object"
+        ) {
+            for (
+                const [
+                    column,
+                    value
+                ] of Object.entries(filters)
+            ) {
+                if (
+                    Array.isArray(value)
+                ) {
+                    query = query.in(
+                        column,
+                        value
+                    );
+                } else {
+                    query = query.eq(
+                        column,
+                        value
+                    );
+                }
+            }
+        }
+
+        return await query;
+    } catch (error) {
+        return {
+            data: null,
+            error
+        };
+    }
+}
+
+
+/**
+ * Compatibility alias for database update.
+ *
+ * Supports:
+ * databaseUpdate(
+ *   "profiles",
+ *   { coins: 100 },
+ *   { id: userId }
+ * )
+ */
+export async function databaseUpdate(
+    table,
+    values,
+    filters = null
+) {
+    if (!supabase) {
+        return {
+            data: null,
+            error: new Error(
+                "Supabase is not configured."
+            )
+        };
+    }
+
+    try {
+        let query =
+            supabase
+                .from(table)
+                .update(values);
+
+        if (
+            filters &&
+            typeof filters === "object"
+        ) {
+            for (
+                const [
+                    column,
+                    value
+                ] of Object.entries(filters)
+            ) {
+                if (
+                    Array.isArray(value)
+                ) {
+                    query = query.in(
+                        column,
+                        value
+                    );
+                } else {
+                    query = query.eq(
+                        column,
+                        value
+                    );
+                }
+            }
+        }
+
+        return await query.select();
+    } catch (error) {
+        return {
+            data: null,
+            error
+        };
+    }
+}
+
+
+/**
+ * Compatibility alias for database delete.
+ */
+export async function databaseDelete(
+    table,
+    filters = null
+) {
+    if (!supabase) {
+        return {
+            data: null,
+            error: new Error(
+                "Supabase is not configured."
+            )
+        };
+    }
+
+    try {
+        let query =
+            supabase
+                .from(table)
+                .delete();
+
+        if (
+            filters &&
+            typeof filters === "object"
+        ) {
+            for (
+                const [
+                    column,
+                    value
+                ] of Object.entries(filters)
+            ) {
+                if (
+                    Array.isArray(value)
+                ) {
+                    query = query.in(
+                        column,
+                        value
+                    );
+                } else {
+                    query = query.eq(
+                        column,
+                        value
+                    );
+                }
+            }
+        }
+
+        return await query.select();
+    } catch (error) {
+        return {
+            data: null,
+            error
+        };
+    }
+}
+
+
+/* =========================================================
+   EDGE FUNCTIONS
+   ========================================================= */
 
 /**
  * Call a Supabase Edge Function.
@@ -533,20 +827,31 @@ export async function invokeFunction(
     if (!supabase) {
         return {
             data: null,
-            error:
-                new Error(
-                    "Supabase is not configured."
-                )
+            error: new Error(
+                "Supabase is not configured."
+            )
         };
     }
 
-    return await supabase.functions.invoke(
-        functionName,
-        {
-            body
-        }
-    );
+    try {
+        return await supabase.functions.invoke(
+            functionName,
+            {
+                body
+            }
+        );
+    } catch (error) {
+        return {
+            data: null,
+            error
+        };
+    }
 }
+
+
+/* =========================================================
+   STORAGE
+   ========================================================= */
 
 /**
  * Get a public Storage URL.
@@ -559,17 +864,34 @@ export function getPublicStorageUrl(
         return null;
     }
 
-    const {
-        data
-    } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(path);
+    try {
+        const {
+            data
+        } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(path);
 
-    return data?.publicUrl ?? null;
+        return (
+            data?.publicUrl ??
+            null
+        );
+    } catch (error) {
+        console.error(
+            "Failed to get Storage URL:",
+            error
+        );
+
+        return null;
+    }
 }
 
+
+/* =========================================================
+   BACKEND STATUS
+   ========================================================= */
+
 /**
- * Backend status information.
+ * Get backend status.
  */
 export function getBackendStatus() {
     return {
@@ -598,5 +920,10 @@ export function getBackendStatus() {
             )
     };
 }
+
+
+/* =========================================================
+   DEFAULT EXPORT
+   ========================================================= */
 
 export default supabase;
