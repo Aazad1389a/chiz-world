@@ -314,9 +314,56 @@ const DEFAULT_STATE = {
 // ------------------------------------------------------------
 // DEEP CLONE
 // ------------------------------------------------------------
+//
+// The previous implementation used:
+//
+// JSON.parse(JSON.stringify(value))
+//
+// That crashes when value is undefined because:
+// JSON.stringify(undefined) === undefined
+//
+// This implementation safely handles:
+// - undefined
+// - null
+// - primitive values
+// - arrays
+// - plain objects
+// - structuredClone-capable browsers
+// ------------------------------------------------------------
 
 function clone(value) {
-  return JSON.parse(JSON.stringify(value));
+  // undefined and null are valid state values.
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  // Primitive values do not need cloning.
+  if (typeof value !== "object") {
+    return value;
+  }
+
+  // Use native structuredClone when available.
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(value);
+    } catch {
+      // Fall back to the recursive clone below.
+    }
+  }
+
+  // Arrays.
+  if (Array.isArray(value)) {
+    return value.map((item) => clone(item));
+  }
+
+  // Plain objects.
+  const result = {};
+
+  for (const [key, item] of Object.entries(value)) {
+    result[key] = clone(item);
+  }
+
+  return result;
 }
 
 // ------------------------------------------------------------
@@ -324,6 +371,14 @@ function clone(value) {
 // ------------------------------------------------------------
 
 function mergeDeep(target, source) {
+  if (
+    !source ||
+    typeof source !== "object" ||
+    Array.isArray(source)
+  ) {
+    return target;
+  }
+
   for (const key of Object.keys(source)) {
     const sourceValue = source[key];
 
@@ -342,7 +397,7 @@ function mergeDeep(target, source) {
 
       mergeDeep(target[key], sourceValue);
     } else {
-      target[key] = sourceValue;
+      target[key] = clone(sourceValue);
     }
   }
 
@@ -363,8 +418,14 @@ export class GameState {
 
     this.version = 0;
 
-    if (initialState && typeof initialState === "object") {
-      mergeDeep(this.state, clone(initialState));
+    if (
+      initialState &&
+      typeof initialState === "object"
+    ) {
+      mergeDeep(
+        this.state,
+        clone(initialState)
+      );
     }
   }
 
@@ -401,7 +462,10 @@ export class GameState {
   // ----------------------------------------------------------
 
   set(path, value, options = {}) {
-    if (!path || typeof path !== "string") {
+    if (
+      !path ||
+      typeof path !== "string"
+    ) {
       return false;
     }
 
@@ -409,7 +473,11 @@ export class GameState {
 
     let current = this.state;
 
-    for (let i = 0; i < parts.length - 1; i++) {
+    for (
+      let i = 0;
+      i < parts.length - 1;
+      i++
+    ) {
       const part = parts[i];
 
       if (
@@ -423,19 +491,28 @@ export class GameState {
       current = current[part];
     }
 
-    const finalKey = parts[parts.length - 1];
+    const finalKey =
+      parts[parts.length - 1];
 
-    const previousValue = clone(current[finalKey]);
+    const previousValue =
+      clone(current[finalKey]);
 
-    current[finalKey] = clone(value);
+    const nextValue =
+      clone(value);
+
+    current[finalKey] = nextValue;
 
     this.version++;
 
     const change = {
       path,
+
       previousValue,
-      value: clone(value),
+
+      value: clone(nextValue),
+
       version: this.version,
+
       timestamp: Date.now()
     };
 
@@ -458,14 +535,41 @@ export class GameState {
   // ----------------------------------------------------------
 
   update(path, values, options = {}) {
-    const current = this.get(path, {});
+    if (
+      values === undefined ||
+      values === null
+    ) {
+      return this.set(
+        path,
+        values,
+        options
+      );
+    }
+
+    const current =
+      this.get(path, {});
 
     if (
       !current ||
       typeof current !== "object" ||
       Array.isArray(current)
     ) {
-      return this.set(path, values, options);
+      return this.set(
+        path,
+        values,
+        options
+      );
+    }
+
+    if (
+      typeof values !== "object" ||
+      Array.isArray(values)
+    ) {
+      return this.set(
+        path,
+        values,
+        options
+      );
     }
 
     const updated = {
@@ -473,7 +577,11 @@ export class GameState {
       ...clone(values)
     };
 
-    return this.set(path, updated, options);
+    return this.set(
+      path,
+      updated,
+      options
+    );
   }
 
   // ----------------------------------------------------------
@@ -481,17 +589,23 @@ export class GameState {
   // ----------------------------------------------------------
 
   reset(options = {}) {
-    const previous = clone(this.state);
+    const previous =
+      clone(this.state);
 
-    this.state = clone(DEFAULT_STATE);
+    this.state =
+      clone(DEFAULT_STATE);
 
     this.version++;
 
     const change = {
       path: "*",
+
       previousValue: previous,
+
       value: clone(this.state),
+
       version: this.version,
+
       timestamp: Date.now()
     };
 
@@ -509,15 +623,21 @@ export class GameState {
   // ----------------------------------------------------------
 
   subscribe(path, callback) {
-    if (typeof callback !== "function") {
+    if (
+      typeof callback !== "function"
+    ) {
       return () => {};
     }
 
     if (!this.listeners.has(path)) {
-      this.listeners.set(path, new Set());
+      this.listeners.set(
+        path,
+        new Set()
+      );
     }
 
-    const listeners = this.listeners.get(path);
+    const listeners =
+      this.listeners.get(path);
 
     listeners.add(callback);
 
@@ -535,7 +655,8 @@ export class GameState {
   // ----------------------------------------------------------
 
   emit(path, change) {
-    const listeners = this.listeners.get(path);
+    const listeners =
+      this.listeners.get(path);
 
     if (!listeners) {
       return;
@@ -558,59 +679,89 @@ export class GameState {
   // ----------------------------------------------------------
 
   setPlayerPosition(x, y, z) {
-    this.update("player.position", {
-      x,
-      y,
-      z
-    });
+    this.update(
+      "player.position",
+      {
+        x,
+        y,
+        z
+      }
+    );
   }
 
   getPlayerPosition() {
-    return this.get("player.position");
+    return this.get(
+      "player.position"
+    );
   }
 
   setPlayerHealth(health) {
-    const maxHealth = this.get(
-      "player.maxHealth",
-      GAME_CONFIG.player.maxHealth
-    );
+    const maxHealth =
+      this.get(
+        "player.maxHealth",
+        GAME_CONFIG.player.maxHealth
+      );
 
     this.set(
       "player.health",
-      Math.max(0, Math.min(health, maxHealth))
+      Math.max(
+        0,
+        Math.min(
+          health,
+          maxHealth
+        )
+      )
     );
   }
 
   setPlayerStamina(stamina) {
-    const maxStamina = this.get(
-      "player.maxStamina",
-      GAME_CONFIG.player.maxStamina
-    );
+    const maxStamina =
+      this.get(
+        "player.maxStamina",
+        GAME_CONFIG.player.maxStamina
+      );
 
     this.set(
       "player.stamina",
-      Math.max(0, Math.min(stamina, maxStamina))
+      Math.max(
+        0,
+        Math.min(
+          stamina,
+          maxStamina
+        )
+      )
     );
   }
 
   addCoins(amount) {
-    const coins = this.get("player.coins", 0);
+    const coins =
+      this.get(
+        "player.coins",
+        0
+      );
 
     this.set(
       "player.coins",
-      Math.max(0, coins + amount)
+      Math.max(
+        0,
+        coins + amount
+      )
     );
   }
 
   addExperience(amount) {
-    const experience = this.get(
-      "player.experience",
-      0
-    );
+    const experience =
+      this.get(
+        "player.experience",
+        0
+      );
 
     this.set(
       "player.experience",
-      Math.max(0, experience + amount)
+      Math.max(
+        0,
+        experience + amount
+      )
     );
   }
 
@@ -618,18 +769,29 @@ export class GameState {
   // CONNECTION HELPERS
   // ----------------------------------------------------------
 
-  setConnectionStatus(status = {}) {
-    this.update("connection", status);
+  setConnectionStatus(
+    status = {}
+  ) {
+    this.update(
+      "connection",
+      status
+    );
   }
 
   setOnline(online) {
-    this.set("connection.online", Boolean(online));
+    this.set(
+      "connection.online",
+      Boolean(online)
+    );
   }
 
   setPing(ping) {
     this.set(
       "connection.ping",
-      Math.max(0, Number(ping) || 0)
+      Math.max(
+        0,
+        Number(ping) || 0
+      )
     );
   }
 
@@ -638,7 +800,8 @@ export class GameState {
   // ----------------------------------------------------------
 
   setWorldTime(hours) {
-    let time = Number(hours) || 0;
+    let time =
+      Number(hours) || 0;
 
     time %= 24;
 
@@ -646,15 +809,24 @@ export class GameState {
       time += 24;
     }
 
-    this.set("world.timeOfDay", time);
+    this.set(
+      "world.timeOfDay",
+      time
+    );
   }
 
   setWeather(weather) {
-    this.set("world.weather", weather);
+    this.set(
+      "world.weather",
+      weather
+    );
   }
 
   setWorldEvent(event) {
-    this.set("world.worldEvent", event);
+    this.set(
+      "world.worldEvent",
+      event
+    );
   }
 
   // ----------------------------------------------------------
@@ -662,33 +834,55 @@ export class GameState {
   // ----------------------------------------------------------
 
   openMenu() {
-    this.update("ui", {
-      menuOpen: true,
-      pauseOpen: false
-    });
+    this.update(
+      "ui",
+      {
+        menuOpen: true,
+        pauseOpen: false
+      }
+    );
   }
 
   closeMenu() {
-    this.set("ui.menuOpen", false);
+    this.set(
+      "ui.menuOpen",
+      false
+    );
   }
 
   openPause() {
-    this.update("ui", {
-      pauseOpen: true,
-      menuOpen: false
-    });
+    this.update(
+      "ui",
+      {
+        pauseOpen: true,
+        menuOpen: false
+      }
+    );
 
-    this.set("app.paused", true);
+    this.set(
+      "app.paused",
+      true
+    );
   }
 
   closePause() {
-    this.set("ui.pauseOpen", false);
+    this.set(
+      "ui.pauseOpen",
+      false
+    );
 
-    this.set("app.paused", false);
+    this.set(
+      "app.paused",
+      false
+    );
   }
 
   togglePause() {
-    const paused = this.get("app.paused", false);
+    const paused =
+      this.get(
+        "app.paused",
+        false
+      );
 
     if (paused) {
       this.closePause();
@@ -702,26 +896,39 @@ export class GameState {
   // ----------------------------------------------------------
 
   markDirty() {
-    this.set("save.dirty", true);
+    this.set(
+      "save.dirty",
+      true
+    );
   }
 
   markSaved() {
-    this.update("save", {
-      dirty: false,
-      saving: false,
-      lastSavedAt: Date.now(),
-      error: null
-    });
+    this.update(
+      "save",
+      {
+        dirty: false,
+
+        saving: false,
+
+        lastSavedAt: Date.now(),
+
+        error: null
+      }
+    );
   }
 
   markSaveError(error) {
-    this.update("save", {
-      saving: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : String(error)
-    });
+    this.update(
+      "save",
+      {
+        saving: false,
+
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error)
+      }
+    );
   }
 
   // ----------------------------------------------------------
@@ -731,13 +938,21 @@ export class GameState {
   createSnapshot() {
     return {
       version: this.version,
+
       timestamp: Date.now(),
+
       state: clone(this.state)
     };
   }
 
-  restoreSnapshot(snapshot, options = {}) {
-    if (!snapshot || typeof snapshot !== "object") {
+  restoreSnapshot(
+    snapshot,
+    options = {}
+  ) {
+    if (
+      !snapshot ||
+      typeof snapshot !== "object"
+    ) {
       return false;
     }
 
@@ -745,19 +960,30 @@ export class GameState {
       return false;
     }
 
-    this.state = clone(snapshot.state);
+    this.state =
+      clone(snapshot.state);
 
     this.version++;
 
     if (!options.silent) {
-      this.emit("*", {
-        path: "*",
-        previousValue: null,
-        value: clone(this.state),
-        version: this.version,
-        timestamp: Date.now(),
-        restored: true
-      });
+      this.emit(
+        "*",
+        {
+          path: "*",
+
+          previousValue: null,
+
+          value: clone(
+            this.state
+          ),
+
+          version: this.version,
+
+          timestamp: Date.now(),
+
+          restored: true
+        }
+      );
     }
 
     return true;
@@ -767,10 +993,16 @@ export class GameState {
   // CHANGE HISTORY
   // ----------------------------------------------------------
 
-  getRecentChanges(limit = 20) {
+  getRecentChanges(
+    limit = 20
+  ) {
     return this.changeQueue
-      .slice(-Math.max(1, limit))
-      .map((change) => clone(change));
+      .slice(
+        -Math.max(1, limit)
+      )
+      .map((change) =>
+        clone(change)
+      );
   }
 
   clearChangeHistory() {
@@ -795,26 +1027,51 @@ export class GameState {
 
       app: this.get("app"),
 
-      connection: this.get("connection"),
+      connection:
+        this.get(
+          "connection"
+        ),
 
       player: {
-        id: this.get("player.id"),
-        level: this.get("player.level"),
-        health: this.get("player.health"),
-        stamina: this.get("player.stamina"),
-        position: this.get("player.position")
+        id: this.get(
+          "player.id"
+        ),
+
+        level: this.get(
+          "player.level"
+        ),
+
+        health: this.get(
+          "player.health"
+        ),
+
+        stamina: this.get(
+          "player.stamina"
+        ),
+
+        position:
+          this.get(
+            "player.position"
+          )
       },
 
-      world: this.get("world"),
+      world:
+        this.get("world"),
 
       multiplayer: {
-        roomId: this.get("multiplayer.roomId"),
-        playerCount: this.get(
-          "multiplayer.playerCount"
-        )
+        roomId:
+          this.get(
+            "multiplayer.roomId"
+          ),
+
+        playerCount:
+          this.get(
+            "multiplayer.playerCount"
+          )
       },
 
-      save: this.get("save")
+      save:
+        this.get("save")
     };
   }
 
@@ -827,7 +1084,8 @@ export class GameState {
 
     this.changeQueue.length = 0;
 
-    this.state = clone(DEFAULT_STATE);
+    this.state =
+      clone(DEFAULT_STATE);
 
     this.version = 0;
   }
@@ -837,30 +1095,63 @@ export class GameState {
 // SINGLETON
 // ============================================================
 
-export const gameState = new GameState();
+export const gameState =
+  new GameState();
 
 // ============================================================
 // CONVENIENCE FUNCTIONS
 // ============================================================
 
-export function getGameState(path = null, fallback = null) {
-  return gameState.get(path, fallback);
+export function getGameState(
+  path = null,
+  fallback = null
+) {
+  return gameState.get(
+    path,
+    fallback
+  );
 }
 
-export function setGameState(path, value, options = {}) {
-  return gameState.set(path, value, options);
+export function setGameState(
+  path,
+  value,
+  options = {}
+) {
+  return gameState.set(
+    path,
+    value,
+    options
+  );
 }
 
-export function updateGameState(path, values, options = {}) {
-  return gameState.update(path, values, options);
+export function updateGameState(
+  path,
+  values,
+  options = {}
+) {
+  return gameState.update(
+    path,
+    values,
+    options
+  );
 }
 
-export function subscribeGameState(path, callback) {
-  return gameState.subscribe(path, callback);
+export function subscribeGameState(
+  path,
+  callback
+) {
+  return gameState.subscribe(
+    path,
+    callback
+  );
 }
 
-export function resetGameState(options = {}) {
-  return gameState.reset(options);
+export function resetGameState(
+  options = {}
+) {
+  return gameState.reset(
+    options
+  );
 }
 
 // ============================================================
