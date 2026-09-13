@@ -43,27 +43,21 @@ export class AuthManager {
         }
 
         try {
-            this.session =
-                await getSession();
+            this.session = await getSession();
 
-            this.user =
-                this.session?.user ?? null;
+            this.user = this.session?.user ?? null;
 
-            onAuthStateChange(
-                (event, session) => {
-                    this.session =
-                        session;
+            onAuthStateChange((event, session) => {
+                this.session = session;
 
-                    this.user =
-                        session?.user ?? null;
+                this.user = session?.user ?? null;
 
-                    this.notify(
-                        event,
-                        this.user,
-                        this.session
-                    );
-                }
-            );
+                this.notify(
+                    event,
+                    this.user,
+                    this.session
+                );
+            });
 
             this.initialized = true;
 
@@ -83,11 +77,7 @@ export class AuthManager {
     /**
      * Register a new player.
      */
-    async signUp(
-        email,
-        password,
-        metadata = {}
-    ) {
+    async signUp(email, password, metadata = {}) {
         if (!this.supabase) {
             return this.errorResult(
                 "Supabase is not configured."
@@ -107,36 +97,26 @@ export class AuthManager {
         }
 
         try {
-            const {
-                data,
-                error
-            } =
-                await this.supabase.auth.signUp(
-                    {
-                        email:
-                            email.trim(),
+            const { data, error } =
+                await this.supabase.auth.signUp({
+                    email: email.trim(),
+                    password,
 
-                        password,
+                    options: {
+                        data: {
+                            username:
+                                metadata.username ?? "",
 
-                        options: {
-                            data: {
-                                username:
-                                    metadata.username ??
-                                    "",
+                            display_name:
+                                metadata.display_name ?? "",
 
-                                display_name:
-                                    metadata.display_name ??
-                                    "",
+                            avatar:
+                                metadata.avatar ?? "",
 
-                                avatar:
-                                    metadata.avatar ??
-                                    "",
-
-                                ...metadata
-                            }
+                            ...metadata
                         }
                     }
-                );
+                });
 
             if (error) {
                 return this.errorResult(
@@ -145,21 +125,20 @@ export class AuthManager {
                 );
             }
 
-            this.session =
-                data?.session ?? null;
+            this.session = data?.session ?? null;
 
-            this.user =
-                data?.user ?? null;
+            this.user = data?.user ?? null;
 
             return {
                 success: true,
                 user: this.user,
                 session: this.session,
-                needsEmailConfirmation:
-                    Boolean(
-                        data?.user &&
-                        !data?.session
-                    ),
+
+                needsEmailConfirmation: Boolean(
+                    data?.user &&
+                    !data?.session
+                ),
+
                 error: null
             };
         } catch (error) {
@@ -173,10 +152,7 @@ export class AuthManager {
     /**
      * Login existing player.
      */
-    async signIn(
-        email,
-        password
-    ) {
+    async signIn(email, password) {
         if (!this.supabase) {
             return this.errorResult(
                 "Supabase is not configured."
@@ -190,17 +166,11 @@ export class AuthManager {
         }
 
         try {
-            const {
-                data,
-                error
-            } =
-                await this.supabase.auth
-                    .signInWithPassword({
-                        email:
-                            email.trim(),
-
-                        password
-                    });
+            const { data, error } =
+                await this.supabase.auth.signInWithPassword({
+                    email: email.trim(),
+                    password
+                });
 
             if (error) {
                 return this.errorResult(
@@ -209,11 +179,9 @@ export class AuthManager {
                 );
             }
 
-            this.session =
-                data?.session ?? null;
+            this.session = data?.session ?? null;
 
-            this.user =
-                data?.user ?? null;
+            this.user = data?.user ?? null;
 
             return {
                 success: true,
@@ -240,9 +208,7 @@ export class AuthManager {
         }
 
         try {
-            const {
-                error
-            } =
+            const { error } =
                 await this.supabase.auth.signOut();
 
             if (error) {
@@ -270,10 +236,7 @@ export class AuthManager {
     /**
      * Send password reset email.
      */
-    async resetPassword(
-        email,
-        redirectTo = null
-    ) {
+    async resetPassword(email, redirectTo = null) {
         if (!this.supabase) {
             return this.errorResult(
                 "Supabase is not configured."
@@ -290,20 +253,16 @@ export class AuthManager {
             const options = {};
 
             if (redirectTo) {
-                options.redirectTo =
-                    redirectTo;
+                options.redirectTo = redirectTo;
             }
 
-            const {
-                error
-            } =
-                await this.supabase.auth
-                    .resetPasswordForEmail(
-                        email.trim(),
-                        {
-                            ...options
-                        }
-                    );
+            const { error } =
+                await this.supabase.auth.resetPasswordForEmail(
+                    email.trim(),
+                    {
+                        ...options
+                    }
+                );
 
             if (error) {
                 return this.errorResult(
@@ -327,9 +286,7 @@ export class AuthManager {
     /**
      * Update password.
      */
-    async updatePassword(
-        newPassword
-    ) {
+    async updatePassword(newPassword) {
         if (!this.supabase) {
             return this.errorResult(
                 "Supabase is not configured."
@@ -346,15 +303,10 @@ export class AuthManager {
         }
 
         try {
-            const {
-                data,
-                error
-            } =
-                await this.supabase.auth
-                    .updateUser({
-                        password:
-                            newPassword
-                    });
+            const { data, error } =
+                await this.supabase.auth.updateUser({
+                    password: newPassword
+                });
 
             if (error) {
                 return this.errorResult(
@@ -383,9 +335,7 @@ export class AuthManager {
     /**
      * Update user metadata.
      */
-    async updateMetadata(
-        metadata
-    ) {
+    async updateMetadata(metadata) {
         if (!this.supabase) {
             return this.errorResult(
                 "Supabase is not configured."
@@ -394,8 +344,7 @@ export class AuthManager {
 
         if (
             !metadata ||
-            typeof metadata !==
-                "object"
+            typeof metadata !== "object"
         ) {
             return this.errorResult(
                 "Metadata must be an object."
@@ -403,14 +352,10 @@ export class AuthManager {
         }
 
         try {
-            const {
-                data,
-                error
-            } =
-                await this.supabase.auth
-                    .updateUser({
-                        data: metadata
-                    });
+            const { data, error } =
+                await this.supabase.auth.updateUser({
+                    data: metadata
+                });
 
             if (error) {
                 return this.errorResult(
@@ -445,12 +390,8 @@ export class AuthManager {
         }
 
         try {
-            const {
-                data,
-                error
-            } =
-                await this.supabase.auth
-                    .refreshSession();
+            const { data, error } =
+                await this.supabase.auth.refreshSession();
 
             if (error) {
                 console.error(
@@ -462,7 +403,8 @@ export class AuthManager {
             }
 
             this.session =
-                data?.session ?? null;
+                data?.session ??
+                null;
 
             this.user =
                 data?.user ??
@@ -488,8 +430,7 @@ export class AuthManager {
             return this.user;
         }
 
-        this.user =
-            await getCurrentUser();
+        this.user = await getCurrentUser();
 
         return this.user;
     }
@@ -502,8 +443,7 @@ export class AuthManager {
             return this.session;
         }
 
-        this.session =
-            await getSession();
+        this.session = await getSession();
 
         this.user =
             this.session?.user ??
@@ -526,20 +466,14 @@ export class AuthManager {
      * Get player ID.
      */
     getPlayerId() {
-        return (
-            this.user?.id ??
-            null
-        );
+        return this.user?.id ?? null;
     }
 
     /**
      * Get player email.
      */
     getEmail() {
-        return (
-            this.user?.email ??
-            null
-        );
+        return this.user?.email ?? null;
     }
 
     /**
@@ -553,49 +487,35 @@ export class AuthManager {
     }
 
     /**
-     * Listen for auth changes.
+     * Listen for authentication changes.
      */
     onChange(callback) {
-        if (
-            typeof callback !==
-            "function"
-        ) {
+        if (typeof callback !== "function") {
             return () => {};
         }
 
-        this.listeners.add(
-            callback
-        );
+        this.listeners.add(callback);
 
         return () => {
-            this.listeners.delete(
-                callback
-            );
+            this.listeners.delete(callback);
         };
     }
 
     /**
      * Notify application.
      */
-    notify(
-        event,
-        user,
-        session
-    ) {
-        for (
-            const callback of
-                this.listeners
-        ) {
+    notify(event, user, session) {
+        for (const callback of this.listeners) {
             try {
                 callback({
                     event,
                     user,
                     session,
-                    loggedIn:
-                        Boolean(
-                            user &&
-                            session
-                        )
+
+                    loggedIn: Boolean(
+                        user &&
+                        session
+                    )
                 });
             } catch (error) {
                 console.error(
@@ -609,10 +529,7 @@ export class AuthManager {
     /**
      * Standard error result.
      */
-    errorResult(
-        message,
-        error = null
-    ) {
+    errorResult(message, error = null) {
         console.error(
             "AZAD WORLD Auth:",
             message
@@ -622,8 +539,7 @@ export class AuthManager {
             success: false,
             user: null,
             session: null,
-            error:
-                error ?? message
+            error: error ?? message
         };
     }
 
@@ -635,4 +551,19 @@ export class AuthManager {
     }
 }
 
-export default AuthManager;
+/*
+ * Singleton authentication manager.
+ *
+ * IMPORTANT:
+ * Both named and default exports are provided
+ * so every AZAD WORLD module can import it safely:
+ *
+ * import { authManager } from "./auth.js";
+ *
+ * or:
+ *
+ * import authManager from "./auth.js";
+ */
+export const authManager = new AuthManager();
+
+export default authManager;
